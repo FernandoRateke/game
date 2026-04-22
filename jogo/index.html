@@ -3,152 +3,195 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Caverna das Probabilidades</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;500;700&display=swap" rel="stylesheet">
+    <title>Hollow Depths</title>
+    <meta name="description" content="Hollow Depths — A dungeon board game of probability and fate. Explore, fight, survive." />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
+    <!-- TITLE SCREEN -->
+    <div id="title-screen" class="screen active">
+      <div class="title-particles" id="title-particles"></div>
+      <button id="btn-lang-title" class="btn-lang" title="Toggle Language">🌐 PT</button>
+      <div class="title-content" id="title-content">
+        <h1 class="main-title">Hollow Depths</h1>
+        <p class="title-subtitle" data-i18n="titleSubtitle">A Cavern of Probability</p>
+        <p class="title-prompt" data-i18n="titlePrompt">— Click to Begin —</p>
+      </div>
+    </div>
+
     <!-- SETUP SCREEN -->
-    <div id="setup-screen" class="screen active">
+    <div id="setup-screen" class="screen">
       <div class="setup-container" id="menu-initial">
-        <h1 class="game-title">Caverna das Probabilidades</h1>
-        <p class="subtitle">Modo Online (Salas Privadas)</p>
-        
-        <div class="player-selection" style="display:flex; flex-direction:column; align-items:center; gap: 0.5rem;">
-          <label for="player-name" style="font-size:1.1rem;">Seu Nome:</label>
-          <input type="text" id="player-name" placeholder="Digite seu nome" style="width: 100%; max-width: 300px; padding: 12px 16px; font-size: 1.2rem; border-radius: 8px; border: 2px solid #3b82f6; background: #111; color: white; text-align:center;">
+        <h1 class="game-title">Hollow Depths</h1>
+        <p class="subtitle">Online Multiplayer — Private Rooms</p>
+
+        <div style="display:flex; flex-direction:column; align-items:center; gap: 0.5rem; margin-bottom:1.5rem;">
+          <label for="player-name" style="font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px;">YOUR NAME</label>
+          <input type="text" id="player-name" placeholder="Enter your name" style="width:100%; max-width:300px; text-align:center; font-size:1.1rem;">
         </div>
 
-        <div style="display:flex; gap:1rem; margin-top:1rem;">
-          <button id="btn-create-room" class="btn primary glowing">Criar Nova Sala</button>
-        </div>
-        
-        <div style="margin-top:2rem; border-top: 1px solid #333; padding-top:1rem;">
-          <label for="room-code-input" style="display:block; margin-bottom: 0.5rem; font-size:1.1rem;">Tem código de uma sala?</label>
-          <div style="display:flex; gap:1rem; margin-top:0.5rem; justify-content:center; align-items: stretch;">
-             <input type="text" id="room-code-input" placeholder="ABCD" style="width:140px; padding: 10px; font-size: 1.5rem; text-transform:uppercase; text-align: center; letter-spacing: 4px; border-radius: 8px; border: 2px solid #8b5cf6; background: #111; color: white; font-weight: bold;" maxlength="4">
-             <button id="btn-join-room" class="btn secondary">Entrar Sala</button>
+        <div style="margin-bottom:1.5rem;">
+          <label style="display:block; font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px; margin-bottom:0.5rem; text-align:center;">GAME MODE</label>
+          <div class="mode-selector">
+            <div class="mode-btn active" id="mode-individual" data-mode="individual">
+              <h3>⚔️ Individual</h3>
+              <p>Everyone for themselves</p>
+            </div>
+            <div class="mode-btn" id="mode-duo" data-mode="duo">
+              <h3>🤝 Duo</h3>
+              <p>Play in teams of 2</p>
+            </div>
           </div>
         </div>
 
-        <div style="margin-top:2rem;">
-          <button id="btn-rules" class="btn secondary">Ver Regras</button>
+        <div style="display:flex; gap:1rem; margin-bottom:1.5rem;">
+          <button id="btn-create-room" class="btn primary glowing">Create Room</button>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top:1.5rem;">
+          <label for="room-code-input" style="display:block; margin-bottom:0.5rem; font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px; text-align:center;">JOIN A ROOM</label>
+          <div style="display:flex; gap:1rem; margin-top:0.5rem; justify-content:center; align-items:stretch;">
+            <input type="text" id="room-code-input" placeholder="CODE" style="width:140px; font-size:1.5rem; text-transform:uppercase; text-align:center; letter-spacing:4px; font-weight:bold;" maxlength="4">
+            <button id="btn-join-room" class="btn secondary">Join</button>
+          </div>
+        </div>
+
+        <div style="margin-top:1.5rem;">
+          <button id="btn-rules" class="btn secondary">View Rules</button>
         </div>
       </div>
 
       <!-- LOBBY SCREEN -->
       <div class="setup-container" id="menu-lobby" style="display:none;">
-        <h1 class="game-title">Sala: <span id="lobby-room-code" style="color:var(--primary);">----</span></h1>
-        <p class="subtitle">Aguardando jogadores... O host inicia quando estiverem prontos.</p>
-        
-        <ul id="lobby-players-list" style="color: white; text-align: left; list-style: none; padding: 0; min-height:100px; border:1px solid #333; background:#1a1a1a; padding:1rem; border-radius:8px;">
-           <!-- list of players -->
-        </ul>
+        <h1 class="game-title">Room: <span id="lobby-room-code" style="color:var(--gold);">----</span></h1>
+        <p class="subtitle">Waiting for players... Host starts when ready.</p>
+        <p id="lobby-mode-label" style="text-align:center; color:var(--gold-dim); font-family:var(--font-head); font-size:0.85rem; margin-bottom:1rem;">Mode: Individual</p>
+
+        <ul id="lobby-players-list"></ul>
 
         <div style="display:flex; gap:1rem; margin-top:1rem; justify-content:center;">
-          <button id="btn-start" class="btn primary glowing" style="display:none;">Compartilhar Classes (Sorteio) & Iniciar!</button>
-          <button id="btn-cancel-lobby" class="btn secondary">Voltar ao Menu</button>
+          <button id="btn-start" class="btn primary glowing" style="display:none;">Start Game</button>
+          <button id="btn-cancel-lobby" class="btn secondary">Back to Menu</button>
         </div>
       </div>
     </div>
 
+    <!-- CLASS SELECTION SCREEN -->
+    <div id="class-selection-screen">
+      <h1 class="game-title" style="margin-bottom:0.5rem;">Choose Your Class</h1>
+      <p class="subtitle" style="margin-bottom:0;">Select a class to begin your journey</p>
+      <div class="class-grid" id="class-grid"></div>
+      <button id="btn-confirm-class" class="btn primary glowing" style="max-width:300px; opacity:0.4; pointer-events:none;">Confirm Selection</button>
+    </div>
+
     <!-- GAME SCREEN -->
     <div id="game-screen" class="screen">
-      <!-- Sidebar / Status -->
       <aside class="sidebar">
         <div class="turn-info">
-          <h2>Turno Geral: <span id="turn-counter">1</span></h2>
-          <h3 id="current-player-name" class="highlight">Turno de [Nome]</h3>
-        </div>
-        
-        <div id="players-status-list" class="players-list">
-          <!-- Dynamically populated -->
+          <h2>Turn: <span id="turn-counter">1</span></h2>
+          <h3 id="current-player-name" class="highlight">Turn of [Name]</h3>
         </div>
 
+        <div id="players-status-list" class="players-list"></div>
+
         <div class="log-container">
-          <h3>Log de Eventos</h3>
+          <h3>Event Log</h3>
           <div id="event-log" class="event-log"></div>
         </div>
 
-        <!-- Painel de Habilidade da Classe -->
         <div id="class-skill-panel" class="class-skill-panel" style="display:none;">
-          <h4 id="class-skill-title" style="margin:0 0 4px 0; color: var(--primary);">⚡ Habilidade</h4>
-          <p id="class-skill-desc" style="margin:0; font-size:0.8rem; color:#ccc;"></p>
-          <p style="margin:4px 0 0 0; font-size:0.75rem; color:#888;">Pressione <strong style="color:white;">[ ESPAÇO ]</strong> para usar</p>
+          <h4 id="class-skill-title" style="margin:0 0 4px 0; color: var(--gold); font-family:var(--font-head); font-size:0.85rem;">⚡ Skill</h4>
+          <p id="class-skill-desc" style="margin:0; font-size:0.75rem; color:var(--text-muted);"></p>
+          <p style="margin:4px 0 0 0; font-size:0.7rem; color:var(--text-muted);">Press <strong style="color:var(--gold);">[ SPACE ]</strong> to use</p>
         </div>
       </aside>
 
-      <!-- Main Board Area -->
       <main class="board-area">
-        <div id="board-container" class="board">
-          <!-- Grid cells generated by JS -->
-        </div>
-
-        <!-- Controles Info -->
-        <div class="controls-info" style="margin-top:20px; text-align:center; color:#aaa; font-family:'Inter', sans-serif;">
-           <p style="margin-bottom: 5px;">🎮 <strong>Controles:</strong> Use as <strong>Setinhas</strong> do teclado (ou WASD) para mover.</p>
-           <p>Ao lado de inimigos ou outro jogador, pressione <strong>[ ESPAÇO ]</strong> para AÇÃO ou HABILIDADE Especial.</p>
+        <div id="board-container" class="board"></div>
+        <div class="controls-info" style="margin-top:15px; text-align:center;">
+          <p style="margin-bottom:4px;">🎮 <strong>Controls:</strong> Arrow keys to move. <strong>[ SPACE ]</strong> for action/skill.</p>
         </div>
       </main>
     </div>
 
     <!-- MODALS -->
-    <!-- Battle/Interaction Modal -->
     <div id="interaction-modal" class="modal">
       <div class="modal-content interaction-box">
-        <h2 id="modal-title">Encontro!</h2>
+        <h2 id="modal-title" style="font-family:var(--font-head); color:var(--gold);">Encounter!</h2>
         <div id="modal-body" class="modal-body">
-          <p id="modal-desc">Você encontrou algo na escuridão.</p>
-          <div class="dice-area" id="dice-area" style="display: none;">
+          <div id="combat-hp-display" class="combat-hp-display" style="display:none;">
+            <div class="combat-hp-row">
+              <span id="combat-player-label" class="combat-hp-name">You</span>
+              <div class="combat-hp-bar"><div id="combat-player-hp-fill" class="combat-hp-fill hp-ally"></div></div>
+              <span id="combat-player-hp-text" class="combat-hp-text">20/20</span>
+            </div>
+            <div class="combat-hp-row">
+              <span id="combat-enemy-label" class="combat-hp-name">Enemy</span>
+              <div class="combat-hp-bar"><div id="combat-enemy-hp-fill" class="combat-hp-fill hp-enemy"></div></div>
+              <span id="combat-enemy-hp-text" class="combat-hp-text">5/5</span>
+            </div>
+          </div>
+          <p id="modal-desc">You found something in the dark.</p>
+          <div class="dice-area" id="dice-area" style="display:none;">
             <div class="dice-anim">🎲</div>
             <p id="dice-result"></p>
           </div>
         </div>
         <div id="modal-actions" class="modal-actions">
-          <button id="btn-modal-primary" class="btn primary">Atacar</button>
-          <button id="btn-modal-secondary" class="btn secondary">Usar Habilidade</button>
+          <button id="btn-modal-primary" class="btn primary">Attack</button>
+          <button id="btn-modal-secondary" class="btn secondary">Use Skill</button>
         </div>
       </div>
     </div>
 
-    <!-- Rules Modal -->
+    <!-- SPECTATOR BANNER (shown to non-active players during combat) -->
+    <div id="spectator-banner" class="spectator-banner" style="display:none;">
+      <h3 id="spectator-title">Waiting...</h3>
+      <p id="spectator-desc"></p>
+    </div>
+
+    <!-- RULES MODAL -->
     <div id="rules-modal" class="modal">
-      <div class="modal-content interaction-box" style="max-width: 600px; text-align:left; max-height: 80vh; overflow-y:auto;">
-        <h2>Regras do Jogo</h2>
-        <div class="modal-body" style="font-size: 0.95rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-          <p><strong>Objetivo:</strong> Encontre a 🔑 Chave e fuja pela 🚪 Porta!</p>
-          <p><strong>Movimento:</strong> Use as setas ou clique/toque nos botões. Células escuras são reveladas ao andar.</p>
-          <p><strong>Combate PvE:</strong> Enfrente monstros na escuridão! Ao vencer, você recupera 50% da vida perdida naquela batalha.</p>
-          <p><strong>Ataque (PvE e PvP):</strong> Rolar D6: As faces 1 e 2 = 2 de dano; 3 = 3 de dano; 4 e 5 = 0; 6 = Dano Crítico (4). Monstros causam dano fixo.</p>
-          <p><strong>Defesa PvP (Ativo após o 3º turno!):</strong> Rolar D6. Face 1 = Recebe +1 dano extra; 2 e 3 = Dano normal; 4 e 5 = Reduz 1 dano; 6 = Contra-ataque igual ao dano recebido!</p>
+      <div class="modal-content interaction-box" style="max-width:600px; text-align:left; max-height:80vh; overflow-y:auto;">
+        <h2 style="font-family:var(--font-head); color:var(--gold);">Rules</h2>
+        <div class="modal-body" style="font-size:0.85rem; line-height:1.5; display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+          <p><strong>Objective:</strong> Find the 🔑 Key and escape through the 🚪 Door!</p>
+          <p><strong>Movement:</strong> Use arrow keys. Dark cells are revealed as you walk.</p>
+          <p><strong>PvE Combat:</strong> Fight monsters! Upon winning, recover 50% of lost HP from that battle.</p>
+          <p><strong>Attack (D6):</strong> 1-2 = 2 dmg | 3 = 3 dmg | 4-5 = 0 dmg | 6 = Critical (4 dmg)</p>
+          <p><strong>PvP Defense (D6, after 3rd turn):</strong> 1 = +1 extra dmg | 2-3 = normal | 4-5 = -1 dmg | 6 = Counter-attack!</p>
           <p><strong>Classes:</strong></p>
-          <ul>
-            <li><strong>Ladino:</strong> Se vida <= 33%, causa dano dobrado! Permite Fuga em PvE. (3 usos)</li>
-            <li><strong>Bardo:</strong> Paralisa o inimigo por 1 turno. (2 usos)</li>
-            <li><strong>Paladino:</strong> Cura 2 de vida (3 usos). Ao morrer, revive com metade da vida (Passiva).</li>
-            <li><strong>Mago:</strong> Joga mais uma vez, ou usa Portal para se teleportar. (2 usos)</li>
+          <ul style="padding-left:1rem; font-size:0.8rem;">
+            <li><strong>Ladino:</strong> Double damage at ≤33% HP. Can flee PvE. (3 uses)</li>
+            <li><strong>Bardo:</strong> Paralyze enemy for 1 turn. (2 uses)</li>
+            <li><strong>Paladino:</strong> Heal +2 HP (3 uses). Revive once at half HP (passive).</li>
+            <li><strong>Mago:</strong> Extra turn or teleport (Portal). (2 uses)</li>
+            <li><strong>Summoner:</strong> Summon 10HP/2DMG monsters. Teleport monsters to nearest player. (4 uses)</li>
+            <li><strong>Samurai:</strong> Next attack is guaranteed critical. (3 uses)</li>
+            <li><strong>Reaper:</strong> Passive: +2 HP/turn. Active: Invisible for 3 turns. (2 uses)</li>
+            <li><strong>Pictomancer:</strong> Shuffle the entire board. (1 use)</li>
           </ul>
         </div>
-        <button id="btn-close-rules" class="btn primary glowing">Entendido!</button>
+        <button id="btn-close-rules" class="btn primary glowing">Understood!</button>
       </div>
     </div>
 
-    <!-- Win/Loss Screen -->
+    <!-- WIN/LOSS SCREEN -->
     <div id="endgame-screen" class="screen overlay">
-      <div class="modal-content" style="background:#111; overflow:hidden;">
-        <h1 id="endgame-title" class="game-over-title">Fim de Jogo</h1>
-        <p id="endgame-desc"></p>
+      <div class="modal-content" style="background:var(--bg-panel); overflow:hidden;">
+        <h1 id="endgame-title" class="game-over-title">Game Over</h1>
+        <p id="endgame-desc" style="margin:1rem 0; font-family:var(--font-head);"></p>
         <div style="display:flex; gap:1rem; justify-content:center; margin-top:20px;">
-            <button id="btn-restart" class="btn primary">Jogar Novamente</button>
-            <button id="btn-main-menu" class="btn secondary">Menu Principal</button>
+          <button id="btn-restart" class="btn primary">Play Again</button>
+          <button id="btn-main-menu" class="btn secondary">Main Menu</button>
         </div>
       </div>
     </div>
 
-    <!-- Banner de Turno -->
+    <!-- TURN BANNER -->
     <div id="turn-banner" class="turn-banner"></div>
 
-    <!-- Scripts -->
+    <!-- SCRIPTS -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script type="module" src="/src/main.js"></script>
   </body>
