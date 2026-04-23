@@ -121,7 +121,8 @@ export class GameEngine {
       invisibleTurns: 0,
       // Team for duo mode
       team: cfg.team || null
-    }));
+    };
+  });
 
     this.state.turnCounter = 1;
     this.state.activePlayerIndex = 0;
