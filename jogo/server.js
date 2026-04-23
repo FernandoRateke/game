@@ -6,6 +6,9 @@ import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import { GameEngine, ClassesStr } from './src/GameEngine.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const DB_PATH = join(__dirname, 'database.json');
 
 async function loadDb() {
@@ -22,7 +25,6 @@ async function saveDb(data) {
 }
 
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
