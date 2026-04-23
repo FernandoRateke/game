@@ -44,7 +44,7 @@ export const CLASS_DESCRIPTIONS = {
   [ClassesStr.SUMMONER]: {
     title: '👹 Summoner – Invocar / Teleportar',
     desc: 'Cria monstros (10HP/2DMG) no mapa. Em combate, pode teleportar o monstro para o jogador mais próximo.',
-    uses: 4
+    uses: 3
   },
   [ClassesStr.SAMURAI]: {
     title: '⚔️ Samurai – Golpe Crítico',
@@ -53,7 +53,7 @@ export const CLASS_DESCRIPTIONS = {
   },
   [ClassesStr.REAPER]: {
     title: '💀 Reaper – Cura Passiva / Invisibilidade',
-    desc: 'Passiva: cura 2HP por turno geral. Ativo: fica invisível por 3 turnos (não pode ser alvo de PvP).',
+    desc: 'Passiva: cura 1HP por turno geral. Ativo: fica invisível por 3 turnos (não pode ser alvo de PvP).',
     uses: 2
   },
   [ClassesStr.PICTOMANCER]: {
@@ -83,7 +83,7 @@ export class GameEngine {
       [ClassesStr.BARDO]:       { life: 20, uses: 2, color: '#10b981' },
       [ClassesStr.PALADINO]:    { life: 20, uses: 3, color: '#3b82f6' },
       [ClassesStr.MAGO]:        { life: 20, uses: 2, color: '#8b5cf6' },
-      [ClassesStr.SUMMONER]:    { life: 20, uses: 4, color: '#ec4899' },
+      [ClassesStr.SUMMONER]:    { life: 20, uses: 3, color: '#ec4899' },
       [ClassesStr.SAMURAI]:     { life: 20, uses: 3, color: '#ef4444' },
       [ClassesStr.REAPER]:      { life: 18, uses: 2, color: '#6b7280' },
       [ClassesStr.PICTOMANCER]: { life: 20, uses: 1, color: '#06b6d4' }
@@ -94,13 +94,17 @@ export class GameEngine {
     this.state.gameMode = gameMode;
     this.state.summonedMonsters = [];
 
-    this.state.players = playerConfigs.map((cfg, idx) => ({
-      id: idx,
-      name: cfg.name,
-      class: cfg.class,
-      maxLife: this.classesConfig[cfg.class].life,
-      currentLife: this.classesConfig[cfg.class].life,
-      uses: this.classesConfig[cfg.class].uses,
+    this.state.players = playerConfigs.map((cfg, idx) => {
+      let maxLife = this.classesConfig[cfg.class].life;
+      if (gameMode === 'singleplayer') maxLife = Math.floor(maxLife * 1.5);
+      
+      return {
+        id: idx,
+        name: cfg.name,
+        class: cfg.class,
+        maxLife: maxLife,
+        currentLife: maxLife,
+        uses: this.classesConfig[cfg.class].uses,
       x: Math.floor(this.state.mapSize / 2),
       y: Math.floor(this.state.mapSize / 2),
       hasKey: false,
@@ -147,8 +151,8 @@ export class GameEngine {
     this.state.doorPos = this.getRandomEmptyPos(centerX, centerY);
     this.state.map[this.state.doorPos.y][this.state.doorPos.x].type = 'door';
 
-    let monstersPlaced = 0;
-    while (monstersPlaced < 25) {
+    const maxMonsters = this.state.gameMode === 'singleplayer' ? 15 : 25;
+    while (monstersPlaced < maxMonsters) {
       let pos = this.getRandomEmptyPos(centerX, centerY);
       this.state.map[pos.y][pos.x].type = 'monster';
       const mType = this.rolarDado(3);
@@ -320,7 +324,7 @@ export class GameEngine {
   applyReaperPassives() {
     for (const p of this.state.players) {
       if (p.isAlive && p.class === ClassesStr.REAPER) {
-        p.currentLife = Math.min(p.maxLife, p.currentLife + 2);
+        p.currentLife = Math.min(p.maxLife, p.currentLife + 1);
       }
       // Decrement invisibility
       if (p.invisibleTurns > 0) {

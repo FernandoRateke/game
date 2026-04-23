@@ -20,6 +20,8 @@ let gameMode = 'individual';
 const titleScreen = document.getElementById('title-screen');
 const setupScreen = document.getElementById('setup-screen');
 const elmMenuInitial = document.getElementById('menu-initial');
+const elmMenuSingleplayer = document.getElementById('menu-singleplayer');
+const elmMenuMultiplayer = document.getElementById('menu-multiplayer');
 const elmMenuLobby = document.getElementById('menu-lobby');
 const playerNameInput = document.getElementById('player-name');
 const roomCodeInput = document.getElementById('room-code-input');
@@ -34,9 +36,10 @@ const btnConfirmClass = document.getElementById('btn-confirm-class');
 initLang();
 
 function updateAllText() {
-  // Title screen
-  document.querySelector('[data-i18n="titleSubtitle"]').textContent = t('titleSubtitle');
-  document.querySelector('[data-i18n="titlePrompt"]').textContent = t('titlePrompt');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.innerHTML = t(key);
+  });
   // Update language button text
   const langBtn = document.getElementById('btn-lang-title');
   if (langBtn) langBtn.textContent = t('language');
@@ -69,14 +72,75 @@ function spawnParticles() {
 }
 spawnParticles();
 
+const bgMusic = document.getElementById('bg-music');
+let isMusicMuted = false;
+
+document.getElementById('btn-mute-music').addEventListener('click', (e) => {
+  e.stopPropagation();
+  isMusicMuted = !isMusicMuted;
+  bgMusic.muted = isMusicMuted;
+  document.getElementById('btn-mute-music').textContent = isMusicMuted ? '🔇' : '🔊';
+});
+
 titleScreen.addEventListener('click', () => {
   sound.init();
   sound.playTitleGong();
+  if (!isMusicMuted) {
+    bgMusic.volume = 0.3;
+    bgMusic.play().catch(e => console.log('Audio autoplay blocked:', e));
+  }
   document.getElementById('title-content').classList.add('fading');
   setTimeout(() => {
     titleScreen.classList.remove('active');
     setupScreen.classList.add('active');
   }, 2500);
+});
+
+// === MENU NAVIGATION ===
+document.getElementById('btn-menu-single').addEventListener('click', () => {
+  sound.playClick();
+  elmMenuInitial.style.display = 'none';
+  elmMenuSingleplayer.style.display = 'block';
+});
+
+document.getElementById('btn-menu-multi').addEventListener('click', () => {
+  sound.playClick();
+  elmMenuInitial.style.display = 'none';
+  elmMenuMultiplayer.style.display = 'block';
+});
+
+document.querySelectorAll('.btn-back-main').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sound.playClick();
+    elmMenuSingleplayer.style.display = 'none';
+    elmMenuMultiplayer.style.display = 'none';
+    elmMenuInitial.style.display = 'block';
+  });
+});
+
+document.getElementById('btn-sp-new').addEventListener('click', () => {
+  sound.playClick();
+  const pName = document.getElementById('sp-player-name').value.trim() || 'Solo';
+  socket.emit('startSingleplayer', { playerName: pName });
+});
+
+document.getElementById('btn-sp-continue').addEventListener('click', async () => {
+  sound.playClick();
+  const pName = document.getElementById('sp-player-name').value.trim();
+  if (!pName) { alert('Digite seu nome para carregar o jogo!'); return; }
+  
+  try {
+    const res = await fetch(`/api/load-game/${pName}`);
+    const data = await res.json();
+    if (data.success && data.state) {
+      socket.emit('continueSingleplayer', { state: data.state });
+    } else {
+      alert('Nenhum jogo salvo encontrado para este nome.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Erro ao carregar o jogo salvo.');
+  }
 });
 
 // === MODE SELECTOR ===
@@ -160,8 +224,20 @@ socket.on('classSelectionUpdate', ({ takenClasses }) => {
   updateClassGridTaken(takenClasses);
 });
 
+socket.on('classTimerUpdate', (timeLeft) => {
+  const timerEl = document.getElementById('class-timer');
+  if (timerEl) timerEl.textContent = `${timeLeft}s`;
+});
+
 function renderClassGrid(classes, takenClasses) {
   classGrid.innerHTML = '';
+  // Populate the sides with empty slots
+  const lobby = document.getElementById('lobby-players-list').children.length || 1;
+  const listA = document.getElementById('team-a-list');
+  const listB = document.getElementById('team-b-list');
+  if (listA) listA.innerHTML = '<h3 style="color:var(--gold); font-family:var(--font-head); text-align:center; margin-bottom:10px;">Jogadores</h3>';
+  if (listB) listB.innerHTML = ''; // Only used if duo mode later
+
   classes.forEach(cls => {
     const card = document.createElement('div');
     card.className = 'class-card';
@@ -223,6 +299,16 @@ socket.on('gameStarted', (initialState) => {
   engine.state = initialState;
   classSelScreen.classList.remove('active');
   document.getElementById('game-screen').classList.add('active');
+  
+  // Fading Match Started Overlay
+  const overlay = document.getElementById('match-started-overlay');
+  overlay.style.display = 'flex';
+  setTimeout(() => {
+    overlay.style.transition = 'opacity 1.5s ease';
+    overlay.style.opacity = '0';
+    setTimeout(() => { overlay.style.display = 'none'; overlay.style.opacity = '1'; }, 1500);
+  }, 1000);
+
   sound.playTitleGong();
   ui.renderAll();
   updateSkillPanel(initialState);
@@ -295,8 +381,13 @@ socket.on('showModal', (data) => {
 
   ui.btnModalPrimary.textContent = data.primaryBtn;
   ui.btnModalPrimary.onclick = () => {
-    sound.playDiceRoll();
-    socket.emit('rollDice', { roomId: myRoomId, actionType: data.type });
+    if (data.type.startsWith('encounter_')) {
+      sound.playClick();
+      socket.emit('modalResolve', { roomId: myRoomId, actionType: data.type });
+    } else {
+      sound.playDiceRoll();
+      socket.emit('rollDice', { roomId: myRoomId, actionType: data.type });
+    }
   };
 
   if (data.showSecBtn) {
@@ -418,6 +509,63 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     socket.emit('action', { roomId: myRoomId });
   }
+});
+
+// === TUTORIAL LOGIC ===
+const tutorialSteps = [
+  { targetId: 'board-container', text: 'Bem-vindo(a) a Hollow Depths! Seu objetivo é encontrar a chave e a porta.' },
+  { targetId: 'board-container', text: 'Use as SETAS do teclado para mover seu personagem pelas células escuras.' },
+  { targetId: 'players-status-list', text: 'Aqui você vê os status de todos os jogadores, vida e habilidades.' },
+  { targetId: 'class-skill-panel', text: 'Ao apertar ESPAÇO, você usa a habilidade da sua classe (se tiver usos).' },
+  { targetId: 'board-container', text: 'Cuidado! Monstros tentarão te impedir. Entre nas casas deles para lutar e recuperar HP ao vencer.' }
+];
+let currentTutorialStep = 0;
+
+function showTutorialStep() {
+  if (currentTutorialStep >= tutorialSteps.length) {
+    document.getElementById('tutorial-balloon').style.display = 'none';
+    return;
+  }
+  const step = tutorialSteps[currentTutorialStep];
+  const target = document.getElementById(step.targetId);
+  if (!target) { currentTutorialStep++; return showTutorialStep(); }
+
+  const balloon = document.getElementById('tutorial-balloon');
+  const textEl = document.getElementById('tutorial-text');
+  
+  textEl.textContent = step.text;
+  balloon.style.display = 'block';
+  
+  // Position balloon relative to target
+  const rect = target.getBoundingClientRect();
+  balloon.style.top = (rect.top + (rect.height / 2) - 50) + 'px';
+  balloon.style.left = (rect.right + 20) + 'px';
+  
+  // Quick fix if it goes out of screen
+  if (parseFloat(balloon.style.left) + 300 > window.innerWidth) {
+    balloon.style.left = (rect.left - 320) + 'px';
+  }
+}
+
+document.getElementById('btn-tutorial-ok').addEventListener('click', () => {
+  sound.playClick();
+  currentTutorialStep++;
+  showTutorialStep();
+});
+
+document.getElementById('btn-menu-tutorial').addEventListener('click', () => {
+  sound.playClick();
+  // Start a local fake game to show tutorial
+  elmMenuInitial.style.display = 'none';
+  setupScreen.classList.remove('active');
+  document.getElementById('game-screen').classList.add('active');
+  
+  const mockConfig = [{ name: 'Você (Tutorial)', class: ClassesStr.PALADINO }];
+  engine.initGame(mockConfig, 'individual');
+  ui.renderAll();
+  
+  currentTutorialStep = 0;
+  showTutorialStep();
 });
 
 // === GENERIC BUTTONS ===

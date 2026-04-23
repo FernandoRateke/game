@@ -1,10 +1,10 @@
-# 🕯️ Caverna das Probabilidades
+# Hollow Depths
 
 Jogo de tabuleiro multiplayer online baseado em turnos, com temática de masmorra. Jogadores exploram uma caverna escura, coletam uma chave e tentam escapar pela porta — enquanto enfrentam monstros e uns aos outros.
 
 ---
 
-## 🎮 Sobre o Jogo
+## Sobre o Jogo
 
 - **Modo:** Multiplayer Online (2 a 4 jogadores)
 - **Tecnologias:** Node.js, Express, Socket.IO, Vite, JavaScript
@@ -12,26 +12,26 @@ Jogo de tabuleiro multiplayer online baseado em turnos, com temática de masmorr
 
 ---
 
-## ⚡ Classes e Habilidades
+## Classes e Habilidades
 
 | Classe | Habilidade | Usos |
 |---|---|---|
-| ⚡ **Ladino** | Dano dobrado com ≤33% de HP. Pode fugir de monstros. | 3 |
-| 🎵 **Bardo** | Paralisa um inimigo por 1 turno. | 2 |
-| 🛡️ **Paladino** | Cura +2 de vida. Revive 1 vez com metade da vida ao morrer (passiva). | 3 |
-| ✨ **Mago** | Joga mais um turno (Celeridade) ou se teleporta (Portal). | 2 |
+| **Ladino** | Dano dobrado com ≤33% de HP. Pode fugir de monstros. | 3 |
+| **Bardo** | Paralisa um inimigo por 1 turno. | 2 |
+| **Paladino** | Cura +2 de vida. Revive 1 vez com metade da vida ao morrer (passiva). | 3 |
+| **Mago** | Joga mais um turno (Celeridade) ou se teleporta (Portal). | 2 |
 
 ---
 
-## 🎯 Objetivo
+## Objetivo
 
 1. Explore o mapa revelando células escuras com seu movimento.
-2. Encontre a **🔑 Chave**.
-3. Leve a chave até a **🚪 Porta** para vencer!
+2. Encontre a **chave**.
+3. Leve a chave até a **porta** para vencer!
 
 ---
 
-## 🕹️ Controles
+## Controles
 
 | Tecla | Ação |
 |---|---|
@@ -40,7 +40,7 @@ Jogo de tabuleiro multiplayer online baseado em turnos, com temática de masmorr
 
 ---
 
-## 🚀 Como Rodar Localmente
+## Como Rodar Localmente
 
 ### Pré-requisitos
 - [Node.js](https://nodejs.org/) instalado (versão 18+)
@@ -72,7 +72,7 @@ Para que amigos na mesma rede se conectem:
 
 ---
 
-## ☁️ Deploy na Internet (Grátis)
+## Deploy na Internet (Grátis)
 
 O projeto já está configurado para ser hospedado gratuitamente no [Render.com](https://render.com):
 
@@ -86,7 +86,7 @@ O projeto já está configurado para ser hospedado gratuitamente no [Render.com]
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 jogo/
@@ -103,7 +103,7 @@ jogo/
 
 ---
 
-## ⚔️ Regras de Combate
+## Regras de Combate
 
 ### PvE (Jogador vs Monstro)
 - Ao entrar numa célula com monstro, um combate começa.

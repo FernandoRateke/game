@@ -3,7 +3,24 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
 import { GameEngine, ClassesStr } from './src/GameEngine.js';
+
+const DB_PATH = join(__dirname, 'database.json');
+
+async function loadDb() {
+  try {
+    const data = await fs.readFile(DB_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (e) {
+    return { singleplayerSaves: {} };
+  }
+}
+
+async function saveDb(data) {
+  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
+}
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -11,6 +28,24 @@ const server = createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
 app.use(express.static(join(__dirname, 'dist')));
+app.use(express.json());
+
+// === SINGLEPLAYER ENDPOINTS ===
+app.post('/api/save-game', async (req, res) => {
+  const { playerName, state } = req.body;
+  if (!playerName) return res.status(400).send('No name');
+  const db = await loadDb();
+  db.singleplayerSaves[playerName] = state;
+  await saveDb(db);
+  res.send({ success: true });
+});
+
+app.get('/api/load-game/:name', async (req, res) => {
+  const db = await loadDb();
+  const state = db.singleplayerSaves[req.params.name];
+  if (state) res.send({ success: true, state });
+  else res.send({ success: false });
+});
 
 const rooms = {};
 const ALL_CLASSES = [
@@ -75,6 +110,24 @@ io.on('connection', (socket) => {
       classes: ALL_CLASSES,
       takenClasses: []
     });
+
+    // 30s Timer for Class Selection
+    let timeLeft = 30;
+    room.timerInterval = setInterval(() => {
+      timeLeft--;
+      io.to(roomId).emit('classTimerUpdate', timeLeft);
+      if (timeLeft <= 0) {
+        clearInterval(room.timerInterval);
+        // Auto-assign remaining players
+        room.lobby.forEach(p => {
+          if (!room.classSelections[p.socketId]) {
+            const available = ALL_CLASSES.filter(c => !Object.values(room.classSelections).includes(c));
+            room.classSelections[p.socketId] = available[0] || ALL_CLASSES[0];
+          }
+        });
+        startGame(roomId, room);
+      }
+    }, 1000);
   });
 
   socket.on('selectClass', ({ roomId, className }) => {
@@ -95,8 +148,49 @@ io.on('connection', (socket) => {
 
     // Check if all players selected
     if (Object.keys(room.classSelections).length === room.lobby.length) {
+      if (room.timerInterval) clearInterval(room.timerInterval);
       startGame(roomId, room);
     }
+  });
+
+  socket.on('startSingleplayer', ({ playerName }) => {
+    let roomId = generateRoomCode();
+    rooms[roomId] = {
+      engine: new GameEngine(),
+      lobby: [{ socketId: socket.id, name: playerName || 'Solo' }],
+      started: false,
+      gameMode: 'singleplayer',
+      classSelections: {}
+    };
+    socket.join(roomId);
+    socket.emit('roomCreated', { roomId, mode: 'singleplayer' });
+    
+    // Auto-start class selection for singleplayer
+    rooms[roomId].classSelectionStarted = true;
+    socket.emit('startClassSelection', {
+      classes: ALL_CLASSES,
+      takenClasses: []
+    });
+  });
+
+  socket.on('continueSingleplayer', ({ state, roomId }) => {
+    let id = roomId || generateRoomCode();
+    rooms[id] = {
+      engine: new GameEngine(),
+      lobby: state.players.map(p => ({ socketId: socket.id, name: p.name })),
+      started: true,
+      gameMode: 'singleplayer',
+      classSelections: {}
+    };
+    rooms[id].engine.state = state;
+    rooms[id].engine.state.players[0].socketId = socket.id; // Refresh socket
+    
+    socket.join(id);
+    socket.emit('roomCreated', { roomId: id, mode: 'singleplayer' });
+    socket.emit('gameStarted', rooms[id].engine.state);
+    
+    const atvP = rooms[id].engine.getActivePlayer();
+    socket.emit('turnBanner', atvP.name);
   });
 
   function startGame(roomId, room) {
@@ -152,32 +246,7 @@ io.on('connection', (socket) => {
     );
 
     if (enemiesHere.length > 0) {
-      if (actP.turnsPlayed < 2) {
-        socket.emit('logMsg', { msg: `PvP locked for ${actP.name}. (Turn ${actP.turnsPlayed + 1}/3)`, type: 'log-combat' });
-        return;
-      }
-      // Check if target is invisible
-      const def = enemiesHere.find(e => e.invisibleTurns <= 0);
-      if (!def) {
-        socket.emit('logMsg', { msg: 'Target is invisible! Cannot attack.', type: 'log-combat' });
-        return;
-      }
-
-      // Show modal only to active player
-      io.to(actP.socketId).emit('showModal', {
-        title: '⚔️ PvP Combat!',
-        desc: `${actP.name} vs ${def.name}!`,
-        primaryBtn: 'Roll Dice!',
-        showSecBtn: false,
-        type: 'pvp_init',
-        playerHp: actP.currentLife, playerMaxHp: actP.maxLife, playerName: actP.name,
-        enemyHp: def.currentLife, enemyMaxHp: def.maxLife, enemyName: def.name
-      });
-
-      // Show spectator banner to others
-      broadcastSpectator(roomId, actP.socketId, `Turn of ${actP.name}`, `${actP.name} is fighting ${def.name}!`);
-
-      room.activePvP = { atacanteId: actP.id, defensorId: def.id };
+      handleAction(socket, roomId, true);
       return;
     }
 
@@ -203,12 +272,14 @@ io.on('connection', (socket) => {
         resMsg = res.msg;
         io.to(roomId).emit('playSound', 'skill');
       } else if (actP.class === ClassesStr.PICTOMANCER) {
+        actP.uses--;
         io.to(roomId).emit('shuffleAnimation');
         setTimeout(() => {
           const res = engine.usarHabilidade();
           io.to(roomId).emit('logMsg', { msg: res.msg, type: 'log-item' });
           io.to(roomId).emit('syncState', engine.state);
           io.to(roomId).emit('playSound', 'skill');
+          checkTurnEnd(roomId, engine);
         }, 2500);
         return;
       } else if (actP.class === ClassesStr.SUMMONER) {
@@ -413,7 +484,7 @@ io.on('connection', (socket) => {
       io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack (No counter!)', actionType: 'pve_atk_safe' });
     }
 
-    if (actionType === 'pve_summoner_tp') {
+  if (actionType === 'pve_summoner_tp') {
       const cell = engine.state.map[actP.y][actP.x];
       if (cell.monster) {
         actP.uses--;
@@ -429,6 +500,29 @@ io.on('connection', (socket) => {
           actP.uses++; // refund
         }
       }
+    }
+    
+    if (actionType === 'encounter_pvp') {
+      io.to(roomId).emit('closeModal');
+      // Force an action as if space was pressed for PvP
+      handleAction(socket, roomId, true);
+    }
+    
+    if (actionType === 'encounter_bardo') {
+      io.to(roomId).emit('closeModal');
+      const target = engine.findNearestPlayer(actP.x, actP.y, actP.id);
+      if (target) {
+        const res = engine.usarHabilidade(target);
+        io.to(roomId).emit('logMsg', { msg: res.msg, type: 'log-item' });
+        io.to(roomId).emit('playSound', 'skill');
+        io.to(roomId).emit('syncState', engine.state);
+      }
+      checkTurnEnd(roomId, engine);
+    }
+    
+    if (actionType === 'encounter_ignore') {
+      io.to(roomId).emit('closeModal');
+      checkTurnEnd(roomId, engine);
     }
   });
 
@@ -525,7 +619,67 @@ function resolveCellEvent(roomId, engine) {
     return;
   }
 
+  // Encounter check (PvP or Bardo)
+  const enemiesHere = engine.state.players.filter(e =>
+    e.isAlive && e.id !== actP.id && e.x === actP.x && e.y === actP.y &&
+    !engine.areTeammates(actP, e) && e.invisibleTurns <= 0
+  );
+
+  if (enemiesHere.length > 0) {
+    const def = enemiesHere[0];
+    let isBardo = (actP.class === ClassesStr.BARDO && actP.uses > 0);
+    
+    io.to(actP.socketId).emit('showModal', {
+      title: 'Encontro!',
+      desc: `Você encontrou ${def.name}!`,
+      primaryBtn: isBardo ? 'Paralisar (Bardo)' : 'Atacar (PvP)',
+      showSecBtn: true,
+      secBtnTxt: 'Ignorar',
+      type: isBardo ? 'encounter_bardo' : 'encounter_pvp',
+      secType: 'encounter_ignore'
+    });
+    return;
+  }
+
   checkTurnEnd(roomId, engine);
+}
+
+function handleAction(socket, roomId, forcePvP = false) {
+  const room = rooms[roomId];
+  if (!room || !room.started) return;
+  const engine = room.engine;
+  const actP = engine.getActivePlayer();
+
+  // Check PvP
+  const enemiesHere = engine.state.players.filter(e =>
+    e.isAlive && e.id !== actP.id && e.x === actP.x && e.y === actP.y &&
+    !engine.areTeammates(actP, e)
+  );
+
+  if (enemiesHere.length > 0) {
+    if (actP.turnsPlayed < 2) {
+      io.to(actP.socketId).emit('logMsg', { msg: `PvP locked for ${actP.name}. (Turn ${actP.turnsPlayed + 1}/3)`, type: 'log-combat' });
+      return;
+    }
+    const def = enemiesHere.find(e => e.invisibleTurns <= 0);
+    if (!def) {
+      io.to(actP.socketId).emit('logMsg', { msg: 'Target is invisible! Cannot attack.', type: 'log-combat' });
+      return;
+    }
+
+    io.to(actP.socketId).emit('showModal', {
+      title: '⚔️ PvP Combat!',
+      desc: `${actP.name} vs ${def.name}!`,
+      primaryBtn: 'Roll Dice!',
+      showSecBtn: false,
+      type: 'pvp_init',
+      playerHp: actP.currentLife, playerMaxHp: actP.maxLife, playerName: actP.name,
+      enemyHp: def.currentLife, enemyMaxHp: def.maxLife, enemyName: def.name
+    });
+
+    broadcastSpectator(roomId, actP.socketId, `Turn of ${actP.name}`, `${actP.name} is fighting ${def.name}!`);
+    room.activePvP = { atacanteId: actP.id, defensorId: def.id };
+  }
 }
 
 function checkTurnEnd(roomId, engine) {
@@ -533,11 +687,26 @@ function checkTurnEnd(roomId, engine) {
   io.to(roomId).emit('syncState', engine.state);
   io.to(roomId).emit('hideSpectatorBanner');
 
+  // Auto-save Singleplayer
+  if (engine.state.gameMode === 'singleplayer' && engine.state.players.length > 0) {
+    const pName = engine.state.players[0].name;
+    loadDb().then(db => {
+      db.singleplayerSaves[pName] = engine.state;
+      saveDb(db).catch(e => console.error('Save failed:', e));
+    });
+  }
+
   if (res.changeTurn) {
     io.to(roomId).emit('logMsg', { msg: '-------------------', type: 'log-turn' });
     const nextP = engine.getActivePlayer();
     io.to(roomId).emit('logMsg', { msg: `Turn: ${nextP.name}`, type: 'log-turn' });
     io.to(roomId).emit('turnBanner', nextP.name);
+    
+    // Auto-combat for Summoner TP
+    const cell = engine.state.map[nextP.y][nextP.x];
+    if (cell.type === 'monster' && cell.monster) {
+      resolveCellEvent(roomId, engine);
+    }
   }
 }
 

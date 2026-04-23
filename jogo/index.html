@@ -11,7 +11,9 @@
     <!-- TITLE SCREEN -->
     <div id="title-screen" class="screen active">
       <div class="title-particles" id="title-particles"></div>
+      <audio id="bg-music" src="/assets/bg-music.mp3" loop></audio>
       <button id="btn-lang-title" class="btn-lang" title="Toggle Language">🌐 PT</button>
+      <button id="btn-mute-music" class="btn-lang" style="right: 80px;" title="Mute Music">🔊</button>
       <div class="title-content" id="title-content">
         <h1 class="main-title">Hollow Depths</h1>
         <p class="title-subtitle" data-i18n="titleSubtitle">A Cavern of Probability</p>
@@ -23,6 +25,33 @@
     <div id="setup-screen" class="screen">
       <div class="setup-container" id="menu-initial">
         <h1 class="game-title">Hollow Depths</h1>
+        <p class="subtitle">A Cavern of Probability</p>
+
+        <div style="display:flex; flex-direction:column; gap:1rem; margin-top: 2rem;">
+          <button id="btn-menu-single" class="btn primary glowing" style="font-size:1.2rem; padding:15px;">Singleplayer</button>
+          <button id="btn-menu-multi" class="btn primary glowing" style="font-size:1.2rem; padding:15px;">Multiplayer</button>
+          <button id="btn-menu-tutorial" class="btn secondary" style="margin-top: 10px;">Como Jogar (Tutorial)</button>
+          <button id="btn-rules" class="btn secondary">View Rules</button>
+        </div>
+      </div>
+
+      <!-- SINGLEPLAYER MENU -->
+      <div class="setup-container" id="menu-singleplayer" style="display:none;">
+        <h1 class="game-title">Singleplayer</h1>
+        <div style="display:flex; flex-direction:column; align-items:center; gap: 0.5rem; margin-bottom:1.5rem;">
+          <label for="sp-player-name" style="font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px;">YOUR NAME</label>
+          <input type="text" id="sp-player-name" placeholder="Enter your name" style="width:100%; max-width:300px; text-align:center; font-size:1.1rem;">
+        </div>
+        <div style="display:flex; gap:1rem; justify-content:center; margin-bottom:1.5rem;">
+          <button id="btn-sp-new" class="btn primary glowing">Novo Jogo</button>
+          <button id="btn-sp-continue" class="btn secondary">Continuar Jogo Salvo</button>
+        </div>
+        <button class="btn secondary btn-back-main">Back</button>
+      </div>
+
+      <!-- MULTIPLAYER MENU -->
+      <div class="setup-container" id="menu-multiplayer" style="display:none;">
+        <h1 class="game-title">Multiplayer</h1>
         <p class="subtitle">Online Multiplayer — Private Rooms</p>
 
         <div style="display:flex; flex-direction:column; align-items:center; gap: 0.5rem; margin-bottom:1.5rem;">
@@ -57,7 +86,7 @@
         </div>
 
         <div style="margin-top:1.5rem;">
-          <button id="btn-rules" class="btn secondary">View Rules</button>
+          <button class="btn secondary btn-back-main">Back</button>
         </div>
       </div>
 
@@ -77,11 +106,29 @@
     </div>
 
     <!-- CLASS SELECTION SCREEN -->
-    <div id="class-selection-screen">
-      <h1 class="game-title" style="margin-bottom:0.5rem;">Choose Your Class</h1>
-      <p class="subtitle" style="margin-bottom:0;">Select a class to begin your journey</p>
-      <div class="class-grid" id="class-grid"></div>
-      <button id="btn-confirm-class" class="btn primary glowing" style="max-width:300px; opacity:0.4; pointer-events:none;">Confirm Selection</button>
+    <div id="class-selection-screen" class="screen">
+      <div style="text-align: center;">
+        <h1 class="game-title" style="margin-bottom:0.5rem;">Choose Your Class</h1>
+        <p class="subtitle" style="margin-bottom:0;">Select a class to begin your journey</p>
+        <p id="class-timer" style="color:var(--gold); font-size:1.5rem; font-weight:bold; margin-top:10px;">30s</p>
+      </div>
+      
+      <div style="display: flex; gap: 2rem; max-width: 1000px; margin: 0 auto; padding: 20px;">
+        <!-- Left: Team 1 / Solo -->
+        <div id="team-a-list" style="flex: 1; display:flex; flex-direction:column; gap: 10px;"></div>
+        
+        <!-- Center: Grid -->
+        <div style="flex: 2;">
+          <div class="class-grid" id="class-grid"></div>
+        </div>
+
+        <!-- Right: Team 2 / Solo -->
+        <div id="team-b-list" style="flex: 1; display:flex; flex-direction:column; gap: 10px;"></div>
+      </div>
+      
+      <div style="text-align:center; margin-top:20px;">
+        <button id="btn-confirm-class" class="btn primary glowing" style="max-width:300px; opacity:0.4; pointer-events:none;">Confirm Selection</button>
+      </div>
     </div>
 
     <!-- GAME SCREEN -->
@@ -153,23 +200,23 @@
     <!-- RULES MODAL -->
     <div id="rules-modal" class="modal">
       <div class="modal-content interaction-box" style="max-width:600px; text-align:left; max-height:80vh; overflow-y:auto;">
-        <h2 style="font-family:var(--font-head); color:var(--gold);">Rules</h2>
+        <h2 style="font-family:var(--font-head); color:var(--gold);" data-i18n="rulesTitle">Rules</h2>
         <div class="modal-body" style="font-size:0.85rem; line-height:1.5; display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-          <p><strong>Objective:</strong> Find the 🔑 Key and escape through the 🚪 Door!</p>
-          <p><strong>Movement:</strong> Use arrow keys. Dark cells are revealed as you walk.</p>
-          <p><strong>PvE Combat:</strong> Fight monsters! Upon winning, recover 50% of lost HP from that battle.</p>
-          <p><strong>Attack (D6):</strong> 1-2 = 2 dmg | 3 = 3 dmg | 4-5 = 0 dmg | 6 = Critical (4 dmg)</p>
-          <p><strong>PvP Defense (D6, after 3rd turn):</strong> 1 = +1 extra dmg | 2-3 = normal | 4-5 = -1 dmg | 6 = Counter-attack!</p>
-          <p><strong>Classes:</strong></p>
+          <p data-i18n="ruleObjective"><strong>Objective:</strong> Find the 🔑 Key and escape through the 🚪 Door!</p>
+          <p data-i18n="ruleMovement"><strong>Movement:</strong> Use arrow keys. Dark cells are revealed as you walk.</p>
+          <p data-i18n="rulePvE"><strong>PvE Combat:</strong> Fight monsters! Upon winning, recover 50% of lost HP from that battle.</p>
+          <p data-i18n="ruleAtk"><strong>Attack (D6):</strong> 1-2 = 2 dmg | 3 = 3 dmg | 4-5 = 0 dmg | 6 = Critical (4 dmg)</p>
+          <p data-i18n="ruleDef"><strong>PvP Defense (D6, after 3rd turn):</strong> 1 = +1 extra dmg | 2-3 = normal | 4-5 = -1 dmg | 6 = Counter-attack!</p>
+          <p data-i18n="ruleClasses"><strong>Classes:</strong></p>
           <ul style="padding-left:1rem; font-size:0.8rem;">
-            <li><strong>Ladino:</strong> Double damage at ≤33% HP. Can flee PvE. (3 uses)</li>
-            <li><strong>Bardo:</strong> Paralyze enemy for 1 turn. (2 uses)</li>
-            <li><strong>Paladino:</strong> Heal +2 HP (3 uses). Revive once at half HP (passive).</li>
-            <li><strong>Mago:</strong> Extra turn or teleport (Portal). (2 uses)</li>
-            <li><strong>Summoner:</strong> Summon 10HP/2DMG monsters. Teleport monsters to nearest player. (4 uses)</li>
-            <li><strong>Samurai:</strong> Next attack is guaranteed critical. (3 uses)</li>
-            <li><strong>Reaper:</strong> Passive: +2 HP/turn. Active: Invisible for 3 turns. (2 uses)</li>
-            <li><strong>Pictomancer:</strong> Shuffle the entire board. (1 use)</li>
+            <li data-i18n="ruleLadino"><strong>Ladino:</strong> Double damage at ≤33% HP. Can flee PvE. (3 uses)</li>
+            <li data-i18n="ruleBardo"><strong>Bardo:</strong> Paralyze enemy for 1 turn. (2 uses)</li>
+            <li data-i18n="rulePaladino"><strong>Paladino:</strong> Heal +2 HP (3 uses). Revive once at half HP (passive).</li>
+            <li data-i18n="ruleMago"><strong>Mago:</strong> Extra turn or teleport (Portal). (2 uses)</li>
+            <li data-i18n="ruleSummoner"><strong>Summoner:</strong> Summon 10HP/2DMG monsters. Teleport monsters to nearest player. (4 uses)</li>
+            <li data-i18n="ruleSamurai"><strong>Samurai:</strong> Next attack is guaranteed critical. (3 uses)</li>
+            <li data-i18n="ruleReaper"><strong>Reaper:</strong> Passive: +2 HP/turn. Active: Invisible for 3 turns. (2 uses)</li>
+            <li data-i18n="rulePictomancer"><strong>Pictomancer:</strong> Shuffle the entire board. (1 use)</li>
           </ul>
         </div>
         <button id="btn-close-rules" class="btn primary glowing">Understood!</button>
@@ -182,14 +229,24 @@
         <h1 id="endgame-title" class="game-over-title">Game Over</h1>
         <p id="endgame-desc" style="margin:1rem 0; font-family:var(--font-head);"></p>
         <div style="display:flex; gap:1rem; justify-content:center; margin-top:20px;">
-          <button id="btn-restart" class="btn primary">Play Again</button>
-          <button id="btn-main-menu" class="btn secondary">Main Menu</button>
+          <button id="btn-main-menu" class="btn primary glowing">Voltar para o Menu</button>
         </div>
       </div>
     </div>
 
     <!-- TURN BANNER -->
     <div id="turn-banner" class="turn-banner"></div>
+
+    <!-- MATCH STARTED OVERLAY -->
+    <div id="match-started-overlay" class="overlay" style="display:none; justify-content:center; align-items:center; z-index:9999; background:rgba(0,0,0,0.9);">
+      <h1 class="game-title" style="font-size: 4rem; animation: pulse 2s infinite;">Partida Iniciada</h1>
+    </div>
+
+    <!-- TUTORIAL BALLOON -->
+    <div id="tutorial-balloon" class="tutorial-balloon" style="display:none;">
+      <p id="tutorial-text"></p>
+      <button id="btn-tutorial-ok" class="btn primary" style="padding: 5px 15px; font-size: 0.8rem; margin-top:10px;">Entendi</button>
+    </div>
 
     <!-- SCRIPTS -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
