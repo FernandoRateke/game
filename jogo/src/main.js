@@ -181,7 +181,15 @@ btnStartGame.addEventListener('click', () => {
 socket.on('roomCreated', ({ roomId, mode }) => {
   myRoomId = roomId;
   isHost = true;
+
+  if (mode === 'singleplayer') {
+    // Singleplayer: class selection is already triggered by server, just wait for it
+    return;
+  }
+
   elmMenuInitial.style.display = 'none';
+  elmMenuSingleplayer.style.display = 'none';
+  elmMenuMultiplayer.style.display = 'none';
   elmMenuLobby.style.display = 'block';
   document.getElementById('lobby-room-code').textContent = roomId;
   document.getElementById('lobby-mode-label').textContent = `Mode: ${mode === 'duo' ? 'Duo' : 'Individual'}`;
@@ -217,6 +225,15 @@ socket.on('startClassSelection', ({ classes, takenClasses }) => {
   selectedClass = null;
   btnConfirmClass.style.opacity = '0.4';
   btnConfirmClass.style.pointerEvents = 'none';
+  btnConfirmClass.textContent = t('confirmSelection');
+
+  // Hide timer for singleplayer
+  const timerEl = document.getElementById('class-timer');
+  if (timerEl) {
+    const isSP = (gameMode === 'singleplayer' || (myRoomId && !isHost === false));
+    timerEl.style.display = 'none'; // hide by default, only show if timer updates come
+  }
+
   renderClassGrid(classes, takenClasses);
 });
 
@@ -226,7 +243,10 @@ socket.on('classSelectionUpdate', ({ takenClasses }) => {
 
 socket.on('classTimerUpdate', (timeLeft) => {
   const timerEl = document.getElementById('class-timer');
-  if (timerEl) timerEl.textContent = `${timeLeft}s`;
+  if (timerEl) {
+    timerEl.style.display = 'block';
+    timerEl.textContent = `${timeLeft}s`;
+  }
 });
 
 function renderClassGrid(classes, takenClasses) {
@@ -252,8 +272,8 @@ function renderClassGrid(classes, takenClasses) {
     card.innerHTML = `
       <img src="${img}" alt="${cls}" />
       <h3>${cls}</h3>
-      <p>${desc.desc}</p>
-      <p style="color:var(--gold); font-size:0.7rem; margin-top:4px;">${desc.uses} uses</p>
+      <p class="card-desc">${desc.desc}</p>
+      <span class="card-uses">${desc.uses} ${t('uses')}</span>
     `;
 
     card.addEventListener('click', () => {
@@ -291,14 +311,22 @@ btnConfirmClass.addEventListener('click', () => {
   socket.emit('selectClass', { roomId: myRoomId, className: selectedClass });
   btnConfirmClass.style.opacity = '0.4';
   btnConfirmClass.style.pointerEvents = 'none';
-  btnConfirmClass.textContent = 'Waiting for others...';
+  btnConfirmClass.textContent = t('waitingOthers');
 });
 
 // === GAME START ===
 socket.on('gameStarted', (initialState) => {
   engine.state = initialState;
   classSelScreen.classList.remove('active');
+  setupScreen.classList.remove('active');
   document.getElementById('game-screen').classList.add('active');
+
+  // Re-configure board grid dimensions from received state
+  const mapSize = initialState.mapSize || 10;
+  const boardContainer = document.getElementById('board-container');
+  boardContainer.style.gridTemplateColumns = `repeat(${mapSize}, 48px)`;
+  boardContainer.style.gridTemplateRows = `repeat(${mapSize}, 48px)`;
+  ui.engine.state = initialState;
   
   // Fading Match Started Overlay
   const overlay = document.getElementById('match-started-overlay');
@@ -344,7 +372,7 @@ let bannerTimeout;
 socket.on('turnBanner', (playerName) => {
   sound.playTurnChange();
   const banner = document.getElementById('turn-banner');
-  banner.textContent = `Turn of ${playerName}`;
+  banner.textContent = `${t('turnOf')} ${playerName}`;
   banner.classList.add('show');
   clearTimeout(bannerTimeout);
   bannerTimeout = setTimeout(() => banner.classList.remove('show'), 4000);
@@ -414,9 +442,9 @@ socket.on('hideSpectatorBanner', () => {
 socket.on('updateModalPrimary', (data) => {
   ui.btnModalPrimary.textContent = data.text;
   ui.btnModalPrimary.onclick = () => {
-    if (data.actionType === 'pve_atk') {
+    if (data.actionType === 'pve_atk' || data.actionType === 'pve_atk_safe') {
       sound.playDiceRoll();
-      socket.emit('rollDice', { roomId: myRoomId, actionType: 'pve_atk' });
+      socket.emit('rollDice', { roomId: myRoomId, actionType: data.actionType });
     } else {
       socket.emit('modalResolve', { roomId: myRoomId, actionType: data.actionType });
     }
@@ -513,11 +541,14 @@ document.addEventListener('keydown', (e) => {
 
 // === TUTORIAL LOGIC ===
 const tutorialSteps = [
-  { targetId: 'board-container', text: 'Bem-vindo(a) a Hollow Depths! Seu objetivo é encontrar a chave e a porta.' },
-  { targetId: 'board-container', text: 'Use as SETAS do teclado para mover seu personagem pelas células escuras.' },
-  { targetId: 'players-status-list', text: 'Aqui você vê os status de todos os jogadores, vida e habilidades.' },
-  { targetId: 'class-skill-panel', text: 'Ao apertar ESPAÇO, você usa a habilidade da sua classe (se tiver usos).' },
-  { targetId: 'board-container', text: 'Cuidado! Monstros tentarão te impedir. Entre nas casas deles para lutar e recuperar HP ao vencer.' }
+  { targetId: 'board-container',      text: '🗺️ Bem-vindo(a) a Hollow Depths! Este é o tabuleiro. Células escuras escondem perigos. Mova-se pelas setas do teclado.' },
+  { targetId: 'board-container',      text: '🔑 Essa célula iluminada é uma Chave. Você precisa pegá-la para abrir a Porta.' },
+  { targetId: 'board-container',      text: '🚪 Essa é a Porta de Saída. Com a Chave em mãos, entre nela para vencer!' },
+  { targetId: 'board-container',      text: '👹 Cuidado com os Monstros! Entre na célula deles para iniciar o combate. Se vencer, recupera 50% do HP perdido.' },
+  { targetId: 'players-status-list',  text: '❤️ Aqui ficam os status dos jogadores: HP, habilidades restantes e efeitos ativos (chave, invisibilidade, etc).' },
+  { targetId: 'class-skill-panel',    text: '⚡ Pressione ESPAÇO para usar a habilidade da sua classe. Cada classe tem usos limitados — use com sabedoria!' },
+  { targetId: 'event-log',            text: '📜 O Log de Eventos registra tudo: movimentos, combates e itens coletados.' },
+  { targetId: 'board-container',      text: '✅ Tutorial concluído! Feche e volte ao menu para iniciar uma partida de verdade. Boa sorte, aventureiro!' }
 ];
 let currentTutorialStep = 0;
 
@@ -538,13 +569,19 @@ function showTutorialStep() {
   
   // Position balloon relative to target
   const rect = target.getBoundingClientRect();
-  balloon.style.top = (rect.top + (rect.height / 2) - 50) + 'px';
-  balloon.style.left = (rect.right + 20) + 'px';
+  const balloonH = 140;
+  let top = rect.top + (rect.height / 2) - balloonH / 2;
+  let left = rect.right + 20;
   
   // Quick fix if it goes out of screen
-  if (parseFloat(balloon.style.left) + 300 > window.innerWidth) {
-    balloon.style.left = (rect.left - 320) + 'px';
+  if (left + 310 > window.innerWidth) {
+    left = rect.left - 330;
   }
+  if (top < 10) top = 10;
+  if (top + balloonH > window.innerHeight - 10) top = window.innerHeight - balloonH - 10;
+  
+  balloon.style.top = top + 'px';
+  balloon.style.left = left + 'px';
 }
 
 document.getElementById('btn-tutorial-ok').addEventListener('click', () => {
@@ -560,12 +597,44 @@ document.getElementById('btn-menu-tutorial').addEventListener('click', () => {
   setupScreen.classList.remove('active');
   document.getElementById('game-screen').classList.add('active');
   
-  const mockConfig = [{ name: 'Você (Tutorial)', class: ClassesStr.PALADINO }];
+  const mockConfig = [{ name: 'Aventureiro', class: ClassesStr.PALADINO }];
   engine.initGame(mockConfig, 'individual');
+
+  // Pre-reveal a 5x5 area around the player start
+  const cx = Math.floor(engine.state.mapSize / 2);
+  const cy = Math.floor(engine.state.mapSize / 2);
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx >= 0 && nx < engine.state.mapSize && ny >= 0 && ny < engine.state.mapSize) {
+        engine.state.map[ny][nx].revealed = true;
+      }
+    }
+  }
+
+  // Place a visible key, monster, and door near the player for tutorial
+  const tutorialPlacements = [
+    { dx: 2, dy: 0, type: 'key' },
+    { dx: -2, dy: 0, type: 'monster', monster: { hp: 5, dmg: 1 } },
+    { dx: 0, dy: 2, type: 'door' }
+  ];
+  tutorialPlacements.forEach(({ dx, dy, type, monster }) => {
+    const nx = Math.max(0, Math.min(engine.state.mapSize - 1, cx + dx));
+    const ny = Math.max(0, Math.min(engine.state.mapSize - 1, cy + dy));
+    engine.state.map[ny][nx].type = type;
+    if (monster) engine.state.map[ny][nx].monster = monster;
+    engine.state.map[ny][nx].revealed = true;
+  });
+
+  // Configure board grid
+  const boardContainer = document.getElementById('board-container');
+  boardContainer.style.gridTemplateColumns = `repeat(${engine.state.mapSize}, 48px)`;
+  boardContainer.style.gridTemplateRows = `repeat(${engine.state.mapSize}, 48px)`;
+
   ui.renderAll();
   
   currentTutorialStep = 0;
-  showTutorialStep();
+  setTimeout(showTutorialStep, 400);
 });
 
 // === GENERIC BUTTONS ===

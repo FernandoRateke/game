@@ -368,7 +368,7 @@ io.on('connection', (socket) => {
       }, 4000);
     }
 
-    if (actionType === 'pve_atk') {
+    if (actionType === 'pve_atk' || actionType === 'pve_atk_safe') {
       if (actP.socketId !== socket.id) return;
       const cell = engine.state.map[actP.y][actP.x];
       const m = cell.monster;
@@ -405,51 +405,62 @@ io.on('connection', (socket) => {
 
         broadcastSpectator(roomId, actP.socketId, `Turn of ${actP.name}`, `${actP.name} defeated a monster!`);
       } else {
-        str += `\nMonster survived (HP: ${m.hp}) and counter-attacks with ${m.dmg} damage!`;
-        const msgDeath = engine.aplicarDano(actP, m.dmg);
-        io.to(roomId).emit('logMsg', { msg: `${actP.name} took ${m.dmg} damage from the monster.`, type: 'log-combat' });
+        // Only apply counter-attack if NOT a safe attack (Bardo paralysis)
+        if (actionType === 'pve_atk') {
+          str += `\nMonster survived (HP: ${m.hp}) and counter-attacks with ${m.dmg} damage!`;
+          const msgDeath = engine.aplicarDano(actP, m.dmg);
+          io.to(roomId).emit('logMsg', { msg: `${actP.name} took ${m.dmg} damage from the monster.`, type: 'log-combat' });
 
-        if (msgDeath) {
-          soundType = 'death';
-          io.to(roomId).emit('logMsg', { msg: msgDeath, type: 'log-combat' });
-        }
-
-        io.to(actP.socketId).emit('diceResult', { text: str, type: soundType,
-          playerHp: actP.currentLife, playerMaxHp: actP.maxLife,
-          enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10
-        });
-        io.to(roomId).emit('syncState', engine.state);
-
-        if (msgDeath && !actP.isAlive) {
-          io.to(actP.socketId).emit('updateModalPrimary', { text: 'Death...', actionType: 'pve_done' });
-        } else {
-          // Show Bardo paralysis option in combat
-          let secBtn = null;
-          let secType = null;
-          if (actP.class === ClassesStr.BARDO && actP.uses > 0) {
-            secBtn = 'Paralyze (skip monster counter-attack)';
-            secType = 'pve_bardo';
-          }
-          if (actP.class === ClassesStr.SUMMONER && actP.uses > 0) {
-            secBtn = 'Teleport Monster to nearest player';
-            secType = 'pve_summoner_tp';
+          if (msgDeath) {
+            soundType = 'death';
+            io.to(roomId).emit('logMsg', { msg: msgDeath, type: 'log-combat' });
           }
 
-          if (secBtn) {
-            io.to(actP.socketId).emit('showModal', {
-              title: '⚔️ PvE Combat',
-              desc: `Monster: ${m.hp} HP | ${m.dmg} Dmg`,
-              primaryBtn: 'Attack Again',
-              showSecBtn: true,
-              secBtnTxt: secBtn,
-              type: 'pve_atk',
-              secType: secType,
-              playerHp: actP.currentLife, playerMaxHp: actP.maxLife, playerName: actP.name,
-              enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10, enemyName: 'Monster'
-            });
+          io.to(actP.socketId).emit('diceResult', { text: str, type: soundType,
+            playerHp: actP.currentLife, playerMaxHp: actP.maxLife,
+            enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10
+          });
+          io.to(roomId).emit('syncState', engine.state);
+
+          if (msgDeath && !actP.isAlive) {
+            io.to(actP.socketId).emit('updateModalPrimary', { text: 'Death...', actionType: 'pve_done' });
           } else {
-            io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack Again', actionType: 'pve_atk' });
+            let secBtn = null;
+            let secType = null;
+            if (actP.class === ClassesStr.BARDO && actP.uses > 0) {
+              secBtn = 'Paralyze (skip monster counter-attack)';
+              secType = 'pve_bardo';
+            }
+            if (actP.class === ClassesStr.SUMMONER && actP.uses > 0) {
+              secBtn = 'Teleport Monster to nearest player';
+              secType = 'pve_summoner_tp';
+            }
+
+            if (secBtn) {
+              io.to(actP.socketId).emit('showModal', {
+                title: '⚔️ PvE Combat',
+                desc: `Monster: ${m.hp} HP | ${m.dmg} Dmg`,
+                primaryBtn: 'Attack Again',
+                showSecBtn: true,
+                secBtnTxt: secBtn,
+                type: 'pve_atk',
+                secType: secType,
+                playerHp: actP.currentLife, playerMaxHp: actP.maxLife, playerName: actP.name,
+                enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10, enemyName: 'Monster'
+              });
+            } else {
+              io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack Again', actionType: 'pve_atk' });
+            }
           }
+        } else {
+          // pve_atk_safe: monster paralyzed by Bardo — no counter-attack this round
+          str += `\nMonster survived (HP: ${m.hp}) — paralyzed, no counter-attack!`;
+          io.to(actP.socketId).emit('diceResult', { text: str, type: soundType,
+            playerHp: actP.currentLife, playerMaxHp: actP.maxLife,
+            enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10
+          });
+          io.to(roomId).emit('syncState', engine.state);
+          io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack Again', actionType: 'pve_atk' });
         }
       }
     }

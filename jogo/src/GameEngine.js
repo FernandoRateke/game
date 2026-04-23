@@ -153,6 +153,7 @@ export class GameEngine {
     this.state.map[this.state.doorPos.y][this.state.doorPos.x].type = 'door';
 
     const maxMonsters = this.state.gameMode === 'singleplayer' ? 15 : 25;
+    let monstersPlaced = 0;
     while (monstersPlaced < maxMonsters) {
       let pos = this.getRandomEmptyPos(centerX, centerY);
       this.state.map[pos.y][pos.x].type = 'monster';
