@@ -108,33 +108,27 @@ io.on('connection', (socket) => {
     room.classSelectionStarted = true;
     room.classSelections = {};
 
+    // Shuffle lobby for draft order
+    room.draftQueue = [...room.lobby].sort(() => Math.random() - 0.5);
+    room.currentDraftIndex = 0;
+
     io.to(roomId).emit('startClassSelection', {
       classes: ALL_CLASSES,
-      takenClasses: []
+      takenClasses: [],
+      draftQueue: room.draftQueue.map(p => ({ socketId: p.socketId, name: p.name }))
     });
 
-    // 30s Timer for Class Selection
-    let timeLeft = 30;
-    room.timerInterval = setInterval(() => {
-      timeLeft--;
-      io.to(roomId).emit('classTimerUpdate', timeLeft);
-      if (timeLeft <= 0) {
-        clearInterval(room.timerInterval);
-        // Auto-assign remaining players
-        room.lobby.forEach(p => {
-          if (!room.classSelections[p.socketId]) {
-            const available = ALL_CLASSES.filter(c => !Object.values(room.classSelections).includes(c));
-            room.classSelections[p.socketId] = available[0] || ALL_CLASSES[0];
-          }
-        });
-        startGame(roomId, room);
-      }
-    }, 1000);
+    startNextDraftTurn(roomId, room);
   });
 
   socket.on('selectClass', ({ roomId, className }) => {
     const room = rooms[roomId];
     if (!room || !room.classSelectionStarted) return;
+
+    if (room.currentDraftPlayer !== socket.id) {
+      socket.emit('errorMsg', 'Não é a sua vez de escolher!');
+      return;
+    }
 
     // Check if class is already taken
     const taken = Object.values(room.classSelections);
@@ -148,11 +142,8 @@ io.on('connection', (socket) => {
 
     io.to(roomId).emit('classSelectionUpdate', { takenClasses });
 
-    // Check if all players selected
-    if (Object.keys(room.classSelections).length === room.lobby.length) {
-      if (room.timerInterval) clearInterval(room.timerInterval);
-      startGame(roomId, room);
-    }
+    room.currentDraftIndex++;
+    startNextDraftTurn(roomId, room);
   });
 
   socket.on('startSingleplayer', ({ playerName }) => {
@@ -169,10 +160,16 @@ io.on('connection', (socket) => {
     
     // Auto-start class selection for singleplayer
     rooms[roomId].classSelectionStarted = true;
+    rooms[roomId].draftQueue = [{ socketId: socket.id, name: playerName || 'Solo' }];
+    rooms[roomId].currentDraftIndex = 0;
+    
     socket.emit('startClassSelection', {
       classes: ALL_CLASSES,
-      takenClasses: []
+      takenClasses: [],
+      draftQueue: rooms[roomId].draftQueue
     });
+    
+    startNextDraftTurn(roomId, rooms[roomId]);
   });
 
   socket.on('continueSingleplayer', ({ state, roomId }) => {
@@ -194,6 +191,39 @@ io.on('connection', (socket) => {
     const atvP = rooms[id].engine.getActivePlayer();
     socket.emit('turnBanner', atvP.name);
   });
+
+  function startNextDraftTurn(roomId, room) {
+    if (room.timerInterval) clearInterval(room.timerInterval);
+    
+    if (room.currentDraftIndex >= room.draftQueue.length) {
+      // everyone drafted
+      startGame(roomId, room);
+      return;
+    }
+
+    const currentP = room.draftQueue[room.currentDraftIndex];
+    room.currentDraftPlayer = currentP.socketId;
+    
+    io.to(roomId).emit('classDraftTurn', {
+      socketId: currentP.socketId,
+      name: currentP.name
+    });
+
+    let timeLeft = 30;
+    room.timerInterval = setInterval(() => {
+      timeLeft--;
+      io.to(roomId).emit('classTimerUpdate', timeLeft);
+      if (timeLeft <= 0) {
+        clearInterval(room.timerInterval);
+        const available = ALL_CLASSES.filter(c => !Object.values(room.classSelections).includes(c));
+        room.classSelections[currentP.socketId] = available[0] || ALL_CLASSES[0];
+        
+        io.to(roomId).emit('classSelectionUpdate', { takenClasses: Object.values(room.classSelections) });
+        room.currentDraftIndex++;
+        startNextDraftTurn(roomId, room);
+      }
+    }, 1000);
+  }
 
   function startGame(roomId, room) {
     const playerConfigs = room.lobby.map((p, idx) => {

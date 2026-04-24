@@ -219,7 +219,9 @@ socket.on('lobbyUpdate', (lobby) => {
 socket.on('errorMsg', (msg) => alert(msg));
 
 // === CLASS SELECTION ===
-socket.on('startClassSelection', ({ classes, takenClasses }) => {
+let currentDraftPlayerId = null;
+
+socket.on('startClassSelection', ({ classes, takenClasses, draftQueue }) => {
   setupScreen.classList.remove('active');
   classSelScreen.classList.add('active');
   selectedClass = null;
@@ -230,11 +232,37 @@ socket.on('startClassSelection', ({ classes, takenClasses }) => {
   // Hide timer for singleplayer
   const timerEl = document.getElementById('class-timer');
   if (timerEl) {
-    const isSP = (gameMode === 'singleplayer' || (myRoomId && !isHost === false));
-    timerEl.style.display = 'none'; // hide by default, only show if timer updates come
+    timerEl.style.display = 'block';
   }
 
-  renderClassGrid(classes, takenClasses);
+  renderClassGrid(classes, takenClasses, draftQueue);
+});
+
+socket.on('classDraftTurn', ({ socketId, name }) => {
+  currentDraftPlayerId = socketId;
+  const subtitle = classSelScreen.querySelector('.subtitle');
+  if (subtitle) {
+    if (socketId === socket.id) {
+      subtitle.innerHTML = `<span style="color: var(--gold-bright); font-weight: bold;">É a sua vez de escolher!</span>`;
+      btnConfirmClass.style.display = 'inline-block';
+    } else {
+      subtitle.innerHTML = `Aguardando a escolha de <span style="color: var(--gold);">${name}</span>...`;
+      btnConfirmClass.style.display = 'none';
+    }
+  }
+
+  // Update UI list to highlight current turn
+  document.querySelectorAll('.draft-player-item').forEach(el => {
+    if (el.dataset.id === socketId) {
+      el.style.color = 'var(--gold-bright)';
+      el.style.fontWeight = 'bold';
+      el.textContent = `▶ ${el.dataset.name} (Escolhendo...)`;
+    } else {
+      el.style.color = 'var(--text-muted)';
+      el.style.fontWeight = 'normal';
+      el.textContent = `  ${el.dataset.name}`;
+    }
+  });
 });
 
 socket.on('classSelectionUpdate', ({ takenClasses }) => {
@@ -249,13 +277,27 @@ socket.on('classTimerUpdate', (timeLeft) => {
   }
 });
 
-function renderClassGrid(classes, takenClasses) {
+function renderClassGrid(classes, takenClasses, draftQueue) {
   classGrid.innerHTML = '';
   // Populate the sides with empty slots
-  const lobby = document.getElementById('lobby-players-list').children.length || 1;
   const listA = document.getElementById('team-a-list');
   const listB = document.getElementById('team-b-list');
-  if (listA) listA.innerHTML = '<h3 style="color:var(--gold); font-family:var(--font-head); text-align:center; margin-bottom:10px;">Jogadores</h3>';
+  if (listA) {
+    listA.innerHTML = '<h3 style="color:var(--gold); font-family:var(--font-head); text-align:center; margin-bottom:10px;">Ordem de Escolha</h3>';
+    if (draftQueue) {
+      draftQueue.forEach(p => {
+        const d = document.createElement('div');
+        d.className = 'draft-player-item';
+        d.dataset.id = p.socketId;
+        d.dataset.name = p.name;
+        d.style.fontFamily = 'monospace';
+        d.style.marginBottom = '5px';
+        d.style.fontSize = '0.9rem';
+        d.textContent = `  ${p.name}`;
+        listA.appendChild(d);
+      });
+    }
+  }
   if (listB) listB.innerHTML = ''; // Only used if duo mode later
 
   classes.forEach(cls => {
@@ -521,7 +563,15 @@ socket.on('showGameOver', () => {
 document.addEventListener('keydown', (e) => {
   if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
   if (!document.getElementById('game-screen').classList.contains('active')) return;
-  if (ui.interactionModal.classList.contains('show')) return;
+  
+  // If modal is open, intercept spacebar for secondary action
+  if (ui.interactionModal.classList.contains('show')) {
+    if (e.key === ' ' && ui.btnModalSecondary.style.display !== 'none') {
+      e.preventDefault();
+      ui.btnModalSecondary.click();
+    }
+    return;
+  }
 
   let dir = null;
   if (e.key === 'ArrowUp' || e.key === 'w') dir = 'up';
