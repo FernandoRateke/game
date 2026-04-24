@@ -529,6 +529,18 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft' || e.key === 'a') dir = 'left';
   if (e.key === 'ArrowRight' || e.key === 'd') dir = 'right';
 
+  if (isTutorialMode) {
+    if (dir) {
+      e.preventDefault();
+      handleTutorialMove(dir);
+    }
+    if (e.key === ' ') {
+      e.preventDefault();
+      handleTutorialAction();
+    }
+    return;
+  }
+
   if (dir) {
     e.preventDefault();
     socket.emit('move', { roomId: myRoomId, dir });
@@ -539,41 +551,26 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// === TUTORIAL LOGIC ===
-const tutorialSteps = [
-  { targetId: 'board-container',      text: '🗺️ Bem-vindo(a) a Hollow Depths! Este é o tabuleiro. Células escuras escondem perigos. Mova-se pelas setas do teclado.' },
-  { targetId: 'board-container',      text: '🔑 Essa célula iluminada é uma Chave. Você precisa pegá-la para abrir a Porta.' },
-  { targetId: 'board-container',      text: '🚪 Essa é a Porta de Saída. Com a Chave em mãos, entre nela para vencer!' },
-  { targetId: 'board-container',      text: '👹 Cuidado com os Monstros! Entre na célula deles para iniciar o combate. Se vencer, recupera 50% do HP perdido.' },
-  { targetId: 'players-status-list',  text: '❤️ Aqui ficam os status dos jogadores: HP, habilidades restantes e efeitos ativos (chave, invisibilidade, etc).' },
-  { targetId: 'class-skill-panel',    text: '⚡ Pressione ESPAÇO para usar a habilidade da sua classe. Cada classe tem usos limitados — use com sabedoria!' },
-  { targetId: 'event-log',            text: '📜 O Log de Eventos registra tudo: movimentos, combates e itens coletados.' },
-  { targetId: 'board-container',      text: '✅ Tutorial concluído! Feche e volte ao menu para iniciar uma partida de verdade. Boa sorte, aventureiro!' }
-];
-let currentTutorialStep = 0;
+// === INTERACTIVE TUTORIAL LOGIC ===
+let isTutorialMode = false;
+let tutPhase = 0;
 
-function showTutorialStep() {
-  if (currentTutorialStep >= tutorialSteps.length) {
-    document.getElementById('tutorial-balloon').style.display = 'none';
-    return;
-  }
-  const step = tutorialSteps[currentTutorialStep];
-  const target = document.getElementById(step.targetId);
-  if (!target) { currentTutorialStep++; return showTutorialStep(); }
-
+function setTutorialBalloon(text, targetId = 'board-container', showBtn = false) {
   const balloon = document.getElementById('tutorial-balloon');
   const textEl = document.getElementById('tutorial-text');
+  const btn = document.getElementById('btn-tutorial-ok');
+  const target = document.getElementById(targetId);
   
-  textEl.textContent = step.text;
+  if (!target) return;
+  textEl.innerHTML = text;
   balloon.style.display = 'block';
+  btn.style.display = showBtn ? 'inline-block' : 'none';
   
-  // Position balloon relative to target
   const rect = target.getBoundingClientRect();
   const balloonH = 140;
   let top = rect.top + (rect.height / 2) - balloonH / 2;
   let left = rect.right + 20;
   
-  // Quick fix if it goes out of screen
   if (left + 310 > window.innerWidth) {
     left = rect.left - 330;
   }
@@ -586,55 +583,187 @@ function showTutorialStep() {
 
 document.getElementById('btn-tutorial-ok').addEventListener('click', () => {
   sound.playClick();
-  currentTutorialStep++;
-  showTutorialStep();
+  if (isTutorialMode) {
+    if (tutPhase === 0) {
+      tutPhase = 0.1;
+      setTutorialBalloon('⚡ Esta é a sua Habilidade. Como Ladino, pode fugir de combates apertando ESPAÇO.', 'class-skill-panel', true);
+    } else if (tutPhase === 0.1) {
+      tutPhase = 0.2;
+      setTutorialBalloon('📜 Este é o Log de Eventos. Tudo fica registrado aqui.', 'event-log', true);
+    } else if (tutPhase === 0.2) {
+      tutPhase = 1;
+      setTutorialBalloon('🗺️ O tabuleiro começa escuro. Agora use as <b>SETAS DO TECLADO</b> para dar um passo para qualquer lado.', 'board-container', false);
+    } else if (tutPhase === 2.5) {
+      tutPhase = 3;
+      setTutorialBalloon('Perfeito! Dê mais um passo no tabuleiro.', 'board-container', false);
+    } else if (tutPhase === 4.5) {
+      tutPhase = 5;
+      setTutorialBalloon('Isso foi repentino! Continue explorando.', 'board-container', false);
+    } else if (tutPhase === 6.5) {
+      tutPhase = 7;
+      setTutorialBalloon('Estamos quase no fim. Dê mais um passo.', 'board-container', false);
+    }
+  }
 });
+
+function handleTutorialMove(dir) {
+  if (![1, 2, 3, 4, 5, 7, 8].includes(tutPhase)) return;
+  
+  const p = engine.getActivePlayer();
+  let nx = p.x; let ny = p.y;
+  if (dir === 'up') ny--;
+  if (dir === 'down') ny++;
+  if (dir === 'left') nx--;
+  if (dir === 'right') nx++;
+  
+  if (nx < 0 || nx >= engine.state.mapSize || ny < 0 || ny >= engine.state.mapSize) return;
+
+  const targetCell = engine.state.map[ny][nx];
+  
+  if (tutPhase === 1) targetCell.type = 'path';
+  else if (tutPhase === 2) targetCell.type = 'key';
+  else if (tutPhase === 3) targetCell.type = 'path';
+  else if (tutPhase === 4) targetCell.type = 'teleport';
+  else if (tutPhase === 5) {
+    targetCell.type = 'monster';
+    targetCell.monster = { hp: 5, dmg: 1 };
+  }
+  else if (tutPhase === 7) {
+    targetCell.type = 'monster';
+    targetCell.monster = { hp: 10, dmg: 2 };
+  }
+  else if (tutPhase === 8) targetCell.type = 'door';
+
+  p.x = nx; p.y = ny;
+  targetCell.revealed = true;
+  sound.playStep();
+  
+  if (tutPhase === 1) {
+    tutPhase = 2;
+    setTutorialBalloon('Você andou e revelou uma carta! Sempre que você entra no escuro, o mapa é revelado. Dê mais um passo!', 'board-container', false);
+  } else if (tutPhase === 2) {
+    tutPhase = 2.5;
+    engine.coletarItem();
+    sound.playKeyPickup();
+    setTutorialBalloon('🔑 Você encontrou a Chave! Ela foi pega automaticamente. Sem ela, a Porta não se abre.', 'board-container', true);
+  } else if (tutPhase === 3) {
+    tutPhase = 4;
+    setTutorialBalloon('Um caminho normal. Dê mais um passo.', 'board-container', false);
+  } else if (tutPhase === 4) {
+    tutPhase = 4.5;
+    sound.playTeleport();
+    setTutorialBalloon('🌀 Um Portal! Portais te teleportam para um local aleatório não revelado do mapa.', 'board-container', true);
+    const emptyPos = engine.getRandomEmptyPos(nx, ny);
+    p.x = emptyPos.x; p.y = emptyPos.y;
+    engine.state.map[p.y][p.x].revealed = true;
+  } else if (tutPhase === 5) {
+    tutPhase = 5.5;
+    document.getElementById('tutorial-balloon').style.display = 'none';
+    sound.playMonsterEncounter();
+    
+    ui.interactionModal.classList.add('show');
+    ui.modalTitle.textContent = 'Combate!';
+    ui.modalDesc.textContent = 'Você encontrou um monstro. Em partidas normais, existem vários tipos. Você precisa lutar usando um dado D6. Clique em Atacar!';
+    ui.diceArea.style.display = 'none';
+    
+    const display = document.getElementById('combat-hp-display');
+    display.style.display = 'block';
+    document.getElementById('combat-player-label').textContent = 'Você';
+    document.getElementById('combat-player-hp-text').textContent = `${p.currentLife}/${p.maxLife}`;
+    document.getElementById('combat-player-hp-fill').style.width = '100%';
+    document.getElementById('combat-enemy-label').textContent = 'Monstro';
+    document.getElementById('combat-enemy-hp-text').textContent = '5/5';
+    document.getElementById('combat-enemy-hp-fill').style.width = '100%';
+    
+    ui.btnModalPrimary.textContent = 'Atacar';
+    ui.btnModalSecondary.style.display = 'none';
+    
+    ui.btnModalPrimary.onclick = () => {
+      sound.playDiceRoll();
+      ui.diceArea.style.display = 'block';
+      ui.diceResult.innerText = '🎲 6 - Dano Crítico!';
+      sound.playCrit();
+      document.getElementById('combat-enemy-hp-text').textContent = '0/5';
+      document.getElementById('combat-enemy-hp-fill').style.width = '0%';
+      ui.btnModalPrimary.style.display = 'none';
+      
+      setTimeout(() => {
+        ui.hideModal();
+        ui.btnModalPrimary.style.display = 'block';
+        sound.playHeal();
+        tutPhase = 6.5;
+        targetCell.type = 'path';
+        targetCell.monster = null;
+        setTutorialBalloon('Vitória! Vencer um combate PvE recupera 50% do HP perdido na luta. Continue!', 'board-container', true);
+        ui.renderAll();
+      }, 2500);
+    };
+  } else if (tutPhase === 7) {
+    tutPhase = 7.5;
+    sound.playMonsterEncounter();
+    setTutorialBalloon('👹 Outro monstro! Mas lembre-se: você é da classe Ninja (Ladino). <br><br><b>Aperte [ ESPAÇO ]</b> agora para usar sua habilidade de Fuga e escapar!', 'class-skill-panel', false);
+  } else if (tutPhase === 8) {
+    tutPhase = 9;
+    sound.playVictory();
+    document.getElementById('tutorial-balloon').style.display = 'none';
+    const end = document.getElementById('endgame-screen');
+    const title = document.getElementById('endgame-title');
+    title.textContent = 'TUTORIAL CONCLUÍDO';
+    title.style.color = '#c8a84e';
+    title.style.textShadow = '0 0 30px rgba(200,168,78,0.6)';
+    document.getElementById('endgame-desc').textContent = 'Você escapou com sucesso! Agora você está pronto para jogar. Crie salas no modo Multiplayer ou jogue Singleplayer.';
+    end.classList.add('active');
+  }
+  
+  ui.renderAll();
+}
+
+function handleTutorialAction() {
+  if (tutPhase === 7.5) {
+    const p = engine.getActivePlayer();
+    if (p.uses > 0) p.uses--;
+    sound.playSkill();
+    setTutorialBalloon('💨 Fuga bem-sucedida! Habilidades têm usos limitados, então pense bem. Agora, vá para o último quadrado encontrar a Porta!', 'board-container', false);
+    const targetCell = engine.state.map[p.y][p.x];
+    targetCell.type = 'path';
+    targetCell.monster = null;
+    tutPhase = 8;
+    ui.renderAll();
+    updateSkillPanel(engine.state);
+  }
+}
 
 document.getElementById('btn-menu-tutorial').addEventListener('click', () => {
   sound.playClick();
-  // Start a local fake game to show tutorial
+  isTutorialMode = true;
+  tutPhase = 0;
+  
   elmMenuInitial.style.display = 'none';
   setupScreen.classList.remove('active');
   document.getElementById('game-screen').classList.add('active');
   
-  const mockConfig = [{ name: 'Aventureiro', class: ClassesStr.PALADINO }];
-  engine.initGame(mockConfig, 'individual');
+  const mockConfig = [{ name: 'Aventureiro', class: ClassesStr.LADINO }];
+  engine.initGame(mockConfig, 'singleplayer');
+  engine.state.players[0].socketId = socket.id;
 
-  // Pre-reveal a 5x5 area around the player start
   const cx = Math.floor(engine.state.mapSize / 2);
   const cy = Math.floor(engine.state.mapSize / 2);
-  for (let dy = -2; dy <= 2; dy++) {
-    for (let dx = -2; dx <= 2; dx++) {
-      const nx = cx + dx, ny = cy + dy;
-      if (nx >= 0 && nx < engine.state.mapSize && ny >= 0 && ny < engine.state.mapSize) {
-        engine.state.map[ny][nx].revealed = true;
-      }
+  for (let y = 0; y < engine.state.mapSize; y++) {
+    for (let x = 0; x < engine.state.mapSize; x++) {
+      engine.state.map[y][x].revealed = (x === cx && y === cy);
+      engine.state.map[y][x].type = 'path';
+      engine.state.map[y][x].monster = null;
     }
   }
 
-  // Place a visible key, monster, and door near the player for tutorial
-  const tutorialPlacements = [
-    { dx: 2, dy: 0, type: 'key' },
-    { dx: -2, dy: 0, type: 'monster', monster: { hp: 5, dmg: 1 } },
-    { dx: 0, dy: 2, type: 'door' }
-  ];
-  tutorialPlacements.forEach(({ dx, dy, type, monster }) => {
-    const nx = Math.max(0, Math.min(engine.state.mapSize - 1, cx + dx));
-    const ny = Math.max(0, Math.min(engine.state.mapSize - 1, cy + dy));
-    engine.state.map[ny][nx].type = type;
-    if (monster) engine.state.map[ny][nx].monster = monster;
-    engine.state.map[ny][nx].revealed = true;
-  });
-
-  // Configure board grid
   const boardContainer = document.getElementById('board-container');
   boardContainer.style.gridTemplateColumns = `repeat(${engine.state.mapSize}, 48px)`;
   boardContainer.style.gridTemplateRows = `repeat(${engine.state.mapSize}, 48px)`;
 
   ui.renderAll();
+  updateSkillPanel(engine.state);
   
-  currentTutorialStep = 0;
-  setTimeout(showTutorialStep, 400);
+  setTutorialBalloon('Bem-vindo a Hollow Depths! Aqui na esquerda ficam os status dos jogadores, como HP e Classe.', 'players-status-list', true);
 });
 
 // === GENERIC BUTTONS ===
