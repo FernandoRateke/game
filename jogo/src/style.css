@@ -303,12 +303,9 @@ input[type="text"]:focus, select:focus {
   font-size: 0.63rem;
   color: var(--text-muted);
   line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   margin: 0;
   width: 100%;
+  padding-bottom: 0.25rem;
 }
 .class-card .card-uses {
   font-size: 0.62rem;
