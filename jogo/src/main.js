@@ -723,7 +723,7 @@ function handleTutorialAction() {
     const p = engine.getActivePlayer();
     if (p.uses > 0) p.uses--;
     sound.playSkill();
-    setTutorialBalloon('💨 Fuga bem-sucedida! Habilidades têm usos limitados, então pense bem. Agora, vá para o último quadrado encontrar a Porta!', 'board-container', false);
+    setTutorialBalloon('💨 Fuga bem-sucedida! Habilidades têm usos limitados, então pense bem. Continue andando para ver o que vai encontrar!', 'board-container', false);
     const targetCell = engine.state.map[p.y][p.x];
     targetCell.type = 'path';
     targetCell.monster = null;
