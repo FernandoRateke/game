@@ -620,6 +620,13 @@ function handleTutorialMove(dir) {
 
   const targetCell = engine.state.map[ny][nx];
   
+  if (targetCell.revealed) {
+    p.x = nx; p.y = ny;
+    sound.playStep();
+    ui.renderAll();
+    return;
+  }
+  
   if (tutPhase === 1) targetCell.type = 'path';
   else if (tutPhase === 2) targetCell.type = 'key';
   else if (tutPhase === 3) targetCell.type = 'path';
@@ -709,6 +716,7 @@ function handleTutorialMove(dir) {
     const end = document.getElementById('endgame-screen');
     const title = document.getElementById('endgame-title');
     title.textContent = 'TUTORIAL CONCLUÍDO';
+    title.style.fontSize = '2.5rem';
     title.style.color = '#c8a84e';
     title.style.textShadow = '0 0 30px rgba(200,168,78,0.6)';
     document.getElementById('endgame-desc').textContent = 'Você escapou com sucesso! Agora você está pronto para jogar. Crie salas no modo Multiplayer ou jogue Singleplayer.';
