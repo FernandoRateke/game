@@ -16,8 +16,10 @@
   <div id="title-screen" class="screen active">
     <div class="title-particles" id="title-particles"></div>
     <audio id="bg-music" src="/assets/bg-music.mp3" loop></audio>
-    <button id="btn-mute-music" class="btn-mute" title="Mute Music">🔊</button>
-    <button id="btn-lang-title" class="btn-lang" title="Toggle Language">🌐 PT</button>
+    <div class="hud-controls">
+      <span id="btn-mute-music" class="hud-icon" title="Mute Music">🔊</span>
+      <span id="btn-lang-title" class="hud-icon" data-i18n="language">🌐 PT</span>
+    </div>
     <div class="title-content" id="title-content">
       <h1 class="main-title">Hollow Depths</h1>
       <p class="title-subtitle" data-i18n="titleSubtitle">A Cave of Probability</p>
@@ -27,101 +29,80 @@
 
   <!-- SETUP SCREEN -->
   <div id="setup-screen" class="screen">
-    <div class="setup-container" id="menu-initial">
-      <h1 class="game-title">Hollow Depths</h1>
-      <p class="subtitle">A Cavern of Probability</p>
 
-      <div style="display:flex; flex-direction:column; gap:1rem; margin-top: 2rem;">
-        <button id="btn-menu-single" class="btn primary glowing"
-          style="font-size:1.2rem; padding:15px;">Singleplayer</button>
-        <button id="btn-menu-multi" class="btn primary glowing"
-          style="font-size:1.2rem; padding:15px;">Multiplayer</button>
-        <button id="btn-menu-tutorial" class="btn secondary" style="margin-top: 10px;">Como Jogar (Tutorial)</button>
-        <button id="btn-rules" class="btn secondary">View Rules</button>
-      </div>
+    <!-- MAIN MENU -->
+    <div class="rpg-menu" id="menu-initial">
+      <h1 class="game-title" data-i18n="mainTitle">Hollow Depths</h1>
+      <p class="rpg-subtitle" data-i18n="titleSubtitle">A Cavern of Probability</p>
+      <nav class="rpg-nav">
+        <button id="btn-menu-single" class="rpg-item" data-i18n="menuSingle">Aventura Solo</button>
+        <button id="btn-menu-multi" class="rpg-item" data-i18n="menuMulti">Multijogador</button>
+        <button id="btn-menu-tutorial" class="rpg-item rpg-item--dim" data-i18n="menuTutorial">Como Jogar</button>
+        <button id="btn-rules" class="rpg-item rpg-item--dim" data-i18n="viewRules">Ver Regras</button>
+      </nav>
     </div>
 
     <!-- SINGLEPLAYER MENU -->
-    <div class="setup-container" id="menu-singleplayer" style="display:none;">
-      <h1 class="game-title">Singleplayer</h1>
-      <div style="display:flex; flex-direction:column; align-items:center; gap: 0.5rem; margin-bottom:1.5rem;">
-        <label for="sp-player-name"
-          style="font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px;">YOUR
-          NAME</label>
-        <input type="text" id="sp-player-name" placeholder="Enter your name"
-          style="width:100%; max-width:300px; text-align:center; font-size:1.1rem;">
+    <div class="rpg-menu" id="menu-singleplayer" style="display:none;">
+      <h1 class="game-title" data-i18n="menuSingle">Aventura Solo</h1>
+      <div class="rpg-field">
+        <label for="sp-player-name" class="rpg-label" data-i18n="yourName">SEU NOME</label>
+        <input type="text" id="sp-player-name" class="rpg-input" data-i18n-placeholder="namePlaceholder" placeholder="Digite seu nome">
       </div>
-      <div style="display:flex; gap:1rem; justify-content:center; margin-bottom:1.5rem;">
-        <button id="btn-sp-new" class="btn primary glowing">Novo Jogo</button>
-        <button id="btn-sp-continue" class="btn secondary">Continuar Jogo Salvo</button>
-      </div>
-      <button class="btn secondary btn-back-main">Back</button>
+      <nav class="rpg-nav">
+        <button id="btn-sp-new" class="rpg-item" data-i18n="newGame">Novo Jogo</button>
+        <button id="btn-sp-continue" class="rpg-item rpg-item--dim" data-i18n="continueGame">Continuar Jogo Salvo</button>
+        <button class="rpg-item rpg-item--back btn-back-main" data-i18n="back">← Voltar</button>
+      </nav>
     </div>
 
     <!-- MULTIPLAYER MENU -->
-    <div class="setup-container" id="menu-multiplayer" style="display:none;">
-      <h1 class="game-title">Multiplayer</h1>
-      <p class="subtitle">Online Multiplayer — Private Rooms</p>
-
-      <div style="display:flex; flex-direction:column; align-items:center; gap: 0.5rem; margin-bottom:1.5rem;">
-        <label for="player-name"
-          style="font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px;">YOUR
-          NAME</label>
-        <input type="text" id="player-name" placeholder="Enter your name"
-          style="width:100%; max-width:300px; text-align:center; font-size:1.1rem;">
+    <div class="rpg-menu" id="menu-multiplayer" style="display:none;">
+      <h1 class="game-title" data-i18n="menuMulti">Multijogador</h1>
+      <p class="rpg-subtitle" data-i18n="menuSubtitle">Multiplayer Online — Salas Privadas</p>
+      <div class="rpg-field">
+        <label for="player-name" class="rpg-label" data-i18n="yourName">SEU NOME</label>
+        <input type="text" id="player-name" class="rpg-input" data-i18n-placeholder="namePlaceholder" placeholder="Digite seu nome">
       </div>
-
-      <div style="margin-bottom:1.5rem;">
-        <label
-          style="display:block; font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px; margin-bottom:0.5rem; text-align:center;">GAME
-          MODE</label>
+      <div class="rpg-field">
+        <label class="rpg-label" data-i18n="gameMode">MODO DE JOGO</label>
         <div class="mode-selector">
           <div class="mode-btn active" id="mode-individual" data-mode="individual">
-            <h3>⚔️ Individual</h3>
-            <p>Everyone for themselves</p>
+            <h3>⚔️ <span data-i18n="modeIndividual">Individual</span></h3>
+            <p data-i18n="modeIndividualDesc">Cada um por si</p>
           </div>
           <div class="mode-btn" id="mode-duo" data-mode="duo">
-            <h3>🤝 Duo</h3>
-            <p>Play in teams of 2</p>
+            <h3>🤝 <span data-i18n="modeDuo">Dupla</span></h3>
+            <p data-i18n="modeDuoDesc">Jogue em times de 2</p>
           </div>
         </div>
       </div>
-
-      <div style="display:flex; gap:1rem; margin-bottom:1.5rem;">
-        <button id="btn-create-room" class="btn primary glowing">Create Room</button>
-      </div>
-
-      <div style="border-top: 1px solid var(--border-color); padding-top:1.5rem;">
-        <label for="room-code-input"
-          style="display:block; margin-bottom:0.5rem; font-size:0.9rem; color:var(--text-muted); font-family:var(--font-head); letter-spacing:1px; text-align:center;">JOIN
-          A ROOM</label>
-        <div style="display:flex; gap:1rem; margin-top:0.5rem; justify-content:center; align-items:stretch;">
-          <input type="text" id="room-code-input" placeholder="CODE"
-            style="width:140px; font-size:1.5rem; text-transform:uppercase; text-align:center; letter-spacing:4px; font-weight:bold;"
-            maxlength="4">
-          <button id="btn-join-room" class="btn secondary">Join</button>
+      <nav class="rpg-nav">
+        <button id="btn-create-room" class="rpg-item" data-i18n="createRoom">Criar Sala</button>
+      </nav>
+      <div class="rpg-divider"></div>
+      <div class="rpg-field">
+        <label for="room-code-input" class="rpg-label" data-i18n="joinRoomLabel">ENTRAR EM UMA SALA</label>
+        <div class="rpg-join-row">
+          <input type="text" id="room-code-input" class="rpg-input rpg-input--code" placeholder="CÓDIGO" maxlength="4">
+          <button id="btn-join-room" class="rpg-item rpg-item--inline" data-i18n="joinBtn">Entrar</button>
         </div>
       </div>
-
-      <div style="margin-top:1.5rem;">
-        <button class="btn secondary btn-back-main">Back</button>
-      </div>
+      <nav class="rpg-nav" style="margin-top:0.5rem;">
+        <button class="rpg-item rpg-item--back btn-back-main" data-i18n="back">← Voltar</button>
+      </nav>
     </div>
 
     <!-- LOBBY SCREEN -->
-    <div class="setup-container" id="menu-lobby" style="display:none;">
-      <h1 class="game-title">Room: <span id="lobby-room-code" style="color:var(--gold);">----</span></h1>
-      <p class="subtitle">Waiting for players... Host starts when ready.</p>
-      <p id="lobby-mode-label"
-        style="text-align:center; color:var(--gold-dim); font-family:var(--font-head); font-size:0.85rem; margin-bottom:1rem;">
-        Mode: Individual</p>
-
+    <div class="rpg-menu" id="menu-lobby" style="display:none;">
+      <h1 class="game-title">Sala: <span id="lobby-room-code" style="color:var(--gold);">----</span></h1>
+      <p class="rpg-subtitle" data-i18n="lobbyWaiting">Aguardando jogadores...</p>
+      <p id="lobby-mode-label" class="rpg-mode-label">Modo: Individual</p>
       <ul id="lobby-players-list"></ul>
-
-      <div style="display:flex; gap:1rem; margin-top:1rem; justify-content:center;">
-        <button id="btn-start" class="btn primary glowing" style="display:none;">Start Game</button>
-        <button id="btn-cancel-lobby" class="btn secondary">Back to Menu</button>
-      </div>
+      <nav class="rpg-nav" style="margin-top:1.5rem;">
+        <button id="btn-start" class="rpg-item" style="display:none;" data-i18n="startGame">Iniciar Jogo</button>
+        <button id="btn-cancel-lobby" class="rpg-item rpg-item--back" data-i18n="backToMenu">← Voltar ao Menu</button>
+      </nav>
     </div>
   </div>
 

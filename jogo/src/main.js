@@ -40,9 +40,11 @@ function updateAllText() {
     const key = el.getAttribute('data-i18n');
     el.innerHTML = t(key);
   });
-  // Update language button text
-  const langBtn = document.getElementById('btn-lang-title');
-  if (langBtn) langBtn.textContent = t('language');
+  // Update input placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    el.placeholder = t(key);
+  });
 }
 
 document.getElementById('btn-lang-title').addEventListener('click', (e) => {
