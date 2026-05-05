@@ -699,6 +699,28 @@ input[type="text"]:focus, select:focus {
   background: rgba(200,168,78,0.1);
 }
 
+/* Mute Music Button */
+.btn-mute {
+  position: absolute;
+  top: 20px;
+  right: 90px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid var(--border-gold);
+  color: var(--gold-dim);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  z-index: 3000;
+  transition: all 0.3s;
+  line-height: 1;
+}
+.btn-mute:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(200,168,78,0.1);
+}
+
 /* Combat HP Display */
 .combat-hp-display {
   margin-bottom: 1rem;
