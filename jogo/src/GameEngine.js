@@ -112,7 +112,7 @@ export class GameEngine {
       turnsPlayed: 0,
       color: this.classesConfig[cfg.class].color,
       // Status effects
-      skipNextTurn: false,
+      paralyzedTurns: 0,
       playAgain: false,
       revived: false,
       // Samurai specific
@@ -158,9 +158,9 @@ export class GameEngine {
       let pos = this.getRandomEmptyPos(centerX, centerY);
       this.state.map[pos.y][pos.x].type = 'monster';
       const mType = this.rolarDado(3);
-      if (mType === 1) this.state.map[pos.y][pos.x].monster = { hp: 5, dmg: 1 };
-      else if (mType === 2) this.state.map[pos.y][pos.x].monster = { hp: 10, dmg: 2 };
-      else this.state.map[pos.y][pos.x].monster = { hp: 5, dmg: 3 };
+      if (mType === 1) this.state.map[pos.y][pos.x].monster = { hp: 5, maxHp: 5, dmg: 1 };
+      else if (mType === 2) this.state.map[pos.y][pos.x].monster = { hp: 10, maxHp: 10, dmg: 2 };
+      else this.state.map[pos.y][pos.x].monster = { hp: 5, maxHp: 5, dmg: 3 };
       monstersPlaced++;
     }
 
@@ -230,7 +230,7 @@ export class GameEngine {
         const cell = this.state.map[ny][nx];
         if (cell.type === 'path') {
           cell.type = 'monster';
-          cell.monster = { hp: 10, dmg: 2, summoned: true, summonerId: summoner.id };
+          cell.monster = { hp: 10, maxHp: 10, dmg: 2, summoned: true, summonerId: summoner.id };
           cell.revealed = true;
           this.state.summonedMonsters.push({ x: nx, y: ny });
           return { x: nx, y: ny };
@@ -241,7 +241,7 @@ export class GameEngine {
     // If no adjacent cell, place randomly
     const pos = this.getRandomEmptyPos(summoner.x, summoner.y);
     this.state.map[pos.y][pos.x].type = 'monster';
-    this.state.map[pos.y][pos.x].monster = { hp: 10, dmg: 2, summoned: true, summonerId: summoner.id };
+    this.state.map[pos.y][pos.x].monster = { hp: 10, maxHp: 10, dmg: 2, summoned: true, summonerId: summoner.id };
     this.state.map[pos.y][pos.x].revealed = true;
     this.state.summonedMonsters.push(pos);
     return pos;
@@ -284,13 +284,24 @@ export class GameEngine {
 
   getRandomEmptyPos(cx, cy) {
     let x, y;
-    while (true) {
+    let attempts = 0;
+    const maxAttempts = 200;
+    while (attempts < maxAttempts) {
       x = Math.floor(Math.random() * this.state.mapSize);
       y = Math.floor(Math.random() * this.state.mapSize);
-      if (x === cx && y === cy) continue;
-      if (this.state.map[y][x].type !== 'path') continue;
+      if (x === cx && y === cy) { attempts++; continue; }
+      if (this.state.map[y][x].type !== 'path') { attempts++; continue; }
       return { x, y };
     }
+    // Fallback: scan grid for any free path cell
+    for (let fy = 0; fy < this.state.mapSize; fy++) {
+      for (let fx = 0; fx < this.state.mapSize; fx++) {
+        if ((fx === cx && fy === cy)) continue;
+        if (this.state.map[fy][fx].type === 'path') return { x: fx, y: fy };
+      }
+    }
+    // Last resort: return center offset
+    return { x: (cx + 1) % this.state.mapSize, y: cy };
   }
 
   getActivePlayer() {
@@ -354,8 +365,8 @@ export class GameEngine {
       }
 
       let nextP = this.getActivePlayer();
-      if (nextP.skipNextTurn) {
-        nextP.skipNextTurn = false;
+      if (nextP.paralyzedTurns > 0) {
+        nextP.paralyzedTurns--;
       } else if (!nextP.isAlive) {
         // continue loop
       } else {
@@ -475,10 +486,10 @@ export class GameEngine {
 
       case ClassesStr.BARDO:
         if (alvo) {
-          alvo.skipNextTurn = true;
-          resMsg = `Bardo paralisou ${alvo.name || 'Inimigo'} por 1 turno!`;
+          alvo.paralyzedTurns = 2;
+          resMsg = `Bardo paralyzed ${alvo.name || 'Enemy'} for 2 turns!`;
         } else {
-          resMsg = "Bardo usou Paralisia no monstro — monstro perde a vez de contra-atacar!";
+          resMsg = "Bardo used Paralyze on the monster — monster loses its counter-attack!";
         }
         break;
 

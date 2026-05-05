@@ -54,7 +54,7 @@ export class UIController {
       let statusIcons = '';
       if (p.hasKey) statusIcons += '🔑 ';
       if (!p.isAlive) statusIcons += '💀 ';
-      if (p.skipNextTurn) statusIcons += '❄️ ';
+      if (p.paralyzedTurns > 0) statusIcons += `❄️(${p.paralyzedTurns}) `;
       if (p.invisibleTurns > 0) statusIcons += '👻 ';
       if (p.critBuff) statusIcons += '🗡️ ';
 

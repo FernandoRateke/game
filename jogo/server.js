@@ -398,7 +398,7 @@ io.on('connection', (socket) => {
       }, 4000);
     }
 
-    if (actionType === 'pve_atk' || actionType === 'pve_atk_safe') {
+      if (actionType === 'pve_atk' || actionType === 'pve_atk_safe') {
       if (actP.socketId !== socket.id) return;
       const cell = engine.state.map[actP.y][actP.x];
       const m = cell.monster;
@@ -415,7 +415,7 @@ io.on('connection', (socket) => {
       let soundType = atkRes.isCrit ? 'crit' : (atkRes.dmg > 0 ? 'hit' : 'miss');
 
       if (m.hp <= 0) {
-        let lostLife = (m.initialEncounterLife || actP.currentLife) - Math.max(0, actP.currentLife);
+        let lostLife = (m.playerLifeAtEncounter || actP.currentLife) - Math.max(0, actP.currentLife);
         if (lostLife > 0 && actP.isAlive) {
           let recovered = Math.ceil(lostLife / 2);
           actP.currentLife = Math.min(actP.maxLife, actP.currentLife + recovered);
@@ -428,7 +428,7 @@ io.on('connection', (socket) => {
 
         io.to(actP.socketId).emit('diceResult', { text: str, type: soundType,
           playerHp: actP.currentLife, playerMaxHp: actP.maxLife,
-          enemyHp: 0, enemyMaxHp: m.initialEncounterLife || 10
+          enemyHp: 0, enemyMaxHp: m.maxHp || 10
         });
         io.to(roomId).emit('syncState', engine.state);
         io.to(actP.socketId).emit('updateModalPrimary', { text: 'Continue', actionType: 'pve_done' });
@@ -448,35 +448,25 @@ io.on('connection', (socket) => {
 
           io.to(actP.socketId).emit('diceResult', { text: str, type: soundType,
             playerHp: actP.currentLife, playerMaxHp: actP.maxLife,
-            enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10
+            enemyHp: m.hp, enemyMaxHp: m.maxHp || 10
           });
           io.to(roomId).emit('syncState', engine.state);
 
           if (msgDeath && !actP.isAlive) {
             io.to(actP.socketId).emit('updateModalPrimary', { text: 'Death...', actionType: 'pve_done' });
           } else {
-            let secBtn = null;
-            let secType = null;
-            if (actP.class === ClassesStr.BARDO && actP.uses > 0) {
-              secBtn = 'Paralyze (skip monster counter-attack)';
-              secType = 'pve_bardo';
-            }
-            if (actP.class === ClassesStr.SUMMONER && actP.uses > 0) {
-              secBtn = 'Teleport Monster to nearest player';
-              secType = 'pve_summoner_tp';
-            }
-
-            if (secBtn) {
+            const combatSkillBtn = getCombatSkill(actP);
+            if (combatSkillBtn) {
               io.to(actP.socketId).emit('showModal', {
                 title: '⚔️ PvE Combat',
                 desc: `Monster: ${m.hp} HP | ${m.dmg} Dmg`,
                 primaryBtn: 'Attack Again',
                 showSecBtn: true,
-                secBtnTxt: secBtn,
+                secBtnTxt: combatSkillBtn.label,
                 type: 'pve_atk',
-                secType: secType,
+                secType: combatSkillBtn.actionType,
                 playerHp: actP.currentLife, playerMaxHp: actP.maxLife, playerName: actP.name,
-                enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10, enemyName: 'Monster'
+                enemyHp: m.hp, enemyMaxHp: m.maxHp || 10, enemyName: 'Monster'
               });
             } else {
               io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack Again', actionType: 'pve_atk' });
@@ -487,7 +477,7 @@ io.on('connection', (socket) => {
           str += `\nMonster survived (HP: ${m.hp}) — paralyzed, no counter-attack!`;
           io.to(actP.socketId).emit('diceResult', { text: str, type: soundType,
             playerHp: actP.currentLife, playerMaxHp: actP.maxLife,
-            enemyHp: m.hp, enemyMaxHp: m.initialEncounterLife || 10
+            enemyHp: m.hp, enemyMaxHp: m.maxHp || 10
           });
           io.to(roomId).emit('syncState', engine.state);
           io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack Again', actionType: 'pve_atk' });
@@ -567,12 +557,112 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('closeModal');
       checkTurnEnd(roomId, engine);
     }
-  });
+
+    // === PvE combat skills ===
+    if (actionType === 'pve_paladino_heal') {
+      if (actP.uses > 0) {
+        actP.uses--;
+        actP.currentLife = Math.min(actP.maxLife, actP.currentLife + 2);
+        io.to(roomId).emit('logMsg', { msg: `Paladino used Heal! +2 HP. (HP: ${actP.currentLife}/${actP.maxLife})`, type: 'log-item' });
+        io.to(roomId).emit('playSound', 'heal');
+        io.to(roomId).emit('syncState', engine.state);
+        io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack', actionType: 'pve_atk' });
+      }
+    }
+
+    if (actionType === 'pve_samurai_focus') {
+      if (actP.uses > 0) {
+        actP.uses--;
+        actP.critBuff = true;
+        io.to(roomId).emit('logMsg', { msg: `Samurai activated Focus! Next attack is a guaranteed crit.`, type: 'log-item' });
+        io.to(roomId).emit('playSound', 'skill');
+        io.to(roomId).emit('syncState', engine.state);
+        io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack (CRIT!)', actionType: 'pve_atk' });
+      }
+    }
+
+    if (actionType === 'pve_mago_portal') {
+      if (actP.uses > 0) {
+        actP.uses--;
+        const cell = engine.state.map[actP.y][actP.x];
+        // Teleport away from the monster cell to a random empty cell
+        const newPos = engine.getRandomEmptyPos(actP.x, actP.y);
+        actP.x = newPos.x;
+        actP.y = newPos.y;
+        engine.revelarCelula(newPos.x, newPos.y);
+        io.to(roomId).emit('logMsg', { msg: `Mago used Portal and escaped the monster!`, type: 'log-item' });
+        io.to(roomId).emit('playSound', 'teleport');
+        io.to(roomId).emit('closeModal');
+        io.to(roomId).emit('syncState', engine.state);
+        checkTurnEnd(roomId, engine);
+      }
+    }
+
+    if (actionType === 'pve_reaper_invisible') {
+      if (actP.uses > 0) {
+        actP.uses--;
+        actP.invisibleTurns = 3;
+        io.to(roomId).emit('logMsg', { msg: `Reaper activated Invisibility for 3 turns!`, type: 'log-item' });
+        io.to(roomId).emit('playSound', 'skill');
+        io.to(roomId).emit('syncState', engine.state);
+        io.to(actP.socketId).emit('updateModalPrimary', { text: 'Attack', actionType: 'pve_atk' });
+      }
+    }
+
+    if (actionType === 'pve_pictomancer_shuffle') {
+      if (actP.uses > 0) {
+        actP.uses--;
+        io.to(roomId).emit('shuffleAnimation');
+        setTimeout(() => {
+          engine.shuffleBoard();
+          io.to(roomId).emit('logMsg', { msg: `Pictomancer shuffled the board!`, type: 'log-item' });
+          io.to(roomId).emit('closeModal');
+          io.to(roomId).emit('syncState', engine.state);
+          io.to(roomId).emit('playSound', 'skill');
+          checkTurnEnd(roomId, engine);
+        }, 2500);
+      }
+    }
+
+  }); // end modalResolve
 
   socket.on('disconnect', () => {
     console.log(`[-] Disconnected: ${socket.id}`);
+    // Clear any pending draft timer in rooms this socket was part of
+    for (const roomId in rooms) {
+      const room = rooms[roomId];
+      if (!room.started && room.lobby && room.lobby.some(p => p.socketId === socket.id)) {
+        if (room.timerInterval) {
+          clearInterval(room.timerInterval);
+          room.timerInterval = null;
+        }
+      }
+    }
   });
 });
+
+// === HELPER: get combat skill button for a player class ===
+function getCombatSkill(actP) {
+  if (actP.uses <= 0) return null;
+  switch (actP.class) {
+    case ClassesStr.BARDO:
+      return { label: 'Paralyze (skip counter-attack)', actionType: 'pve_bardo' };
+    case ClassesStr.PALADINO:
+      return { label: 'Heal (+2 HP)', actionType: 'pve_paladino_heal' };
+    case ClassesStr.SAMURAI:
+      return { label: 'Focus (guaranteed crit)', actionType: 'pve_samurai_focus' };
+    case ClassesStr.MAGO:
+      return { label: 'Portal (teleport away)', actionType: 'pve_mago_portal' };
+    case ClassesStr.REAPER:
+      return { label: 'Invisibility (3 turns)', actionType: 'pve_reaper_invisible' };
+    case ClassesStr.PICTOMANCER:
+      return { label: 'Shuffle Board', actionType: 'pve_pictomancer_shuffle' };
+    case ClassesStr.SUMMONER:
+      return { label: 'Teleport Monster to nearest player', actionType: 'pve_summoner_tp' };
+    default:
+      return null;
+  }
+}
 
 // === HELPER: broadcast spectator info to non-active players ===
 function broadcastSpectator(roomId, activeSocketId, title, detail) {
@@ -630,8 +720,8 @@ function resolveCellEvent(roomId, engine) {
   }
 
   if (cell.type === 'monster' && cell.monster) {
-    if (cell.monster.initialEncounterLife === undefined) {
-      cell.monster.initialEncounterLife = actP.currentLife;
+    if (cell.monster.playerLifeAtEncounter === undefined) {
+      cell.monster.playerLifeAtEncounter = actP.currentLife;
     }
 
     let canFlee = (actP.class === ClassesStr.LADINO && actP.uses > 0);
@@ -644,6 +734,15 @@ function resolveCellEvent(roomId, engine) {
       secType = 'pve_summoner_tp';
     }
 
+    // Other class combat skills
+    if (!secBtn) {
+      const combatSkillBtn = getCombatSkill(actP);
+      if (combatSkillBtn) {
+        secBtn = combatSkillBtn.label;
+        secType = combatSkillBtn.actionType;
+      }
+    }
+
     // Only send combat modal to the active player
     io.to(actP.socketId).emit('showModal', {
       title: '⚔️ PvE Combat',
@@ -654,7 +753,7 @@ function resolveCellEvent(roomId, engine) {
       type: 'pve_atk',
       secType: secType,
       playerHp: actP.currentLife, playerMaxHp: actP.maxLife, playerName: actP.name,
-      enemyHp: cell.monster.hp, enemyMaxHp: cell.monster.hp, enemyName: 'Monster'
+      enemyHp: cell.monster.hp, enemyMaxHp: cell.monster.maxHp || cell.monster.hp, enemyName: 'Monster'
     });
 
     // Spectator banner for others
@@ -673,11 +772,11 @@ function resolveCellEvent(roomId, engine) {
     let isBardo = (actP.class === ClassesStr.BARDO && actP.uses > 0);
     
     io.to(actP.socketId).emit('showModal', {
-      title: 'Encontro!',
-      desc: `Você encontrou ${def.name}!`,
-      primaryBtn: isBardo ? 'Paralisar (Bardo)' : 'Atacar (PvP)',
+      title: 'Encounter!',
+      desc: `You found ${def.name}!`,
+      primaryBtn: isBardo ? 'Paralyze (Bardo)' : 'Attack (PvP)',
       showSecBtn: true,
-      secBtnTxt: 'Ignorar',
+      secBtnTxt: 'Ignore',
       type: isBardo ? 'encounter_bardo' : 'encounter_pvp',
       secType: 'encounter_ignore'
     });
@@ -700,7 +799,7 @@ function handleAction(socket, roomId, forcePvP = false) {
   );
 
   if (enemiesHere.length > 0) {
-    if (actP.turnsPlayed < 2) {
+    if (actP.turnsPlayed < 3) {
       io.to(actP.socketId).emit('logMsg', { msg: `PvP locked for ${actP.name}. (Turn ${actP.turnsPlayed + 1}/3)`, type: 'log-combat' });
       return;
     }
